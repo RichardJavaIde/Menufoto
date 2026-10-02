@@ -1,0 +1,139 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+enum ImageFit {
+  COVER
+  CONTAIN
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         Role     @default(USER)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Image {
+  id         String   @id @default(cuid())
+  fileKey    String   @unique
+  width      Int
+  height     Int
+  sizeBytes  Int
+  // Recorte elegido por el admin, en porcentaje (0-100) sobre la imagen original
+  cropX      Float    @default(0)
+  cropY      Float    @default(0)
+  cropWidth  Float    @default(100)
+  cropHeight Float    @default(100)
+  // Punto focal para object-position (0-100)
+  focalX     Float    @default(50)
+  focalY     Float    @default(50)
+  fit        ImageFit @default(COVER)
+  createdAt  DateTime @default(now())
+
+  dishes  Dish[]
+  logoOf  RestaurantSettings[] @relation("Logo")
+  coverOf RestaurantSettings[] @relation("Cover")
+}
+
+model Category {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  sortOrder   Int      @default(0)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  dishes Dish[]
+
+  @@index([sortOrder])
+}
+
+model Dish {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  priceCents  Int
+  // visible: aparece en la carta. available: si es false se muestra "Agotado".
+  visible     Boolean  @default(true)
+  available   Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
+
+  imageId String?
+  image   Image?  @relation(fields: [imageId], references: [id], onDelete: SetNull)
+
+  tags Tag[]
+
+  @@index([categoryId, sortOrder])
+}
+
+model Tag {
+  id        String  @id @default(cuid())
+  name      String  @unique
+  icon      String?
+  sortOrder Int     @default(0)
+
+  dishes Dish[]
+}
+
+model OpeningHour {
+  id        String  @id @default(cuid())
+  dayOfWeek Int // 0 = domingo ... 6 = sábado
+  opensAt   String? // "HH:mm"
+  closesAt  String? // "HH:mm"
+  closed    Boolean @default(false)
+
+  @@index([dayOfWeek])
+}
+
+model RestaurantSettings {
+  id             Int     @id @default(1)
+  name           String  @default("Mi Restaurante")
+  tagline        String?
+  description    String?
+  address        String?
+  phone          String?
+  whatsapp       String?
+  email          String?
+  instagram      String?
+  facebook       String?
+  website        String?
+  currencyCode   String  @default("DOP")
+  currencySymbol String  @default("RD$")
+
+  logoId  String?
+  logo    Image?  @relation("Logo", fields: [logoId], references: [id], onDelete: SetNull)
+  coverId String?
+  cover   Image?  @relation("Cover", fields: [coverId], references: [id], onDelete: SetNull)
+
+  // Apariencia: tema elegido y personalizaciones opcionales
+  themeId         String  @default("elegante")
+  colorPrimary    String?
+  colorAccent     String?
+  colorBackground String?
+  colorText       String?
+  fontHeading     String?
+  fontBody        String?
+
+  updatedAt DateTime @updatedAt
+}
