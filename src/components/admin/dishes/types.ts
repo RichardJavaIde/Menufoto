@@ -1,4 +1,6 @@
 //src/components/admin/dishes/types.ts
+import type { ImageInfo } from "@/lib/media";
+
 export type DishRow = {
   id: string;
   name: string;
@@ -8,6 +10,7 @@ export type DishRow = {
   available: boolean;
   categoryId: string;
   tagIds: string[];
+  image: ImageInfo | null;
 };
 
 export type CategoryOption = { id: string; name: string; active: boolean };

@@ -26,6 +26,7 @@ const price = z
 
 const categoryId = z.string().min(1, "Selecciona una categoría");
 const tagIds = z.array(z.string().min(1)).max(30);
+const imageId = z.string().min(1).nullable();
 const id = z.string().min(1);
 
 export const createDishSchema = z.object({
@@ -34,6 +35,7 @@ export const createDishSchema = z.object({
   price,
   categoryId,
   tagIds,
+  imageId,
   visible: z.boolean(),
   available: z.boolean(),
 });
@@ -45,6 +47,7 @@ export const updateDishSchema = z.object({
   price,
   categoryId,
   tagIds,
+  imageId,
   visible: z.boolean(),
   available: z.boolean(),
 });

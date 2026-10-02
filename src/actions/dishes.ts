@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireSection } from "@/lib/auth";
+import { deleteImageById } from "@/lib/images";
 import type { ActionResult } from "@/lib/action-result";
 import {
   createDishSchema,
@@ -13,6 +14,8 @@ import {
   toggleDishFlagSchema,
   moveDishSchema,
 } from "@/lib/schemas/dish";
+
+const IMAGE_UNAVAILABLE = "La foto ya no está disponible. Súbela de nuevo.";
 
 function dbError(e: unknown): ActionResult {
   if (e instanceof Prisma.PrismaClientKnownRequestError) {
@@ -40,20 +43,40 @@ async function nextSortOrder(categoryId: string) {
   return (last._max.sortOrder ?? -1) + 1;
 }
 
+// Una foto solo se puede asignar si existe y no está en uso por otro plato, el logo o la portada
+async function imageIsFree(imageId: string) {
+  const found = await prisma.image.findFirst({
+    where: {
+      id: imageId,
+      dishes: { none: {} },
+      logoOf: { none: {} },
+      coverOf: { none: {} },
+    },
+    select: { id: true },
+  });
+  return found !== null;
+}
+
 export async function createDishAction(input: unknown): Promise<ActionResult> {
   await requireSection("platos");
 
   const parsed = createDishSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
-  const { name, description, price, categoryId, tagIds, visible, available } = parsed.data;
+  const { name, description, price, categoryId, tagIds, imageId, visible, available } =
+    parsed.data;
 
   try {
+    if (imageId && !(await imageIsFree(imageId))) {
+      return { ok: false, error: IMAGE_UNAVAILABLE };
+    }
+
     await prisma.dish.create({
       data: {
         name,
         description,
         priceCents: price,
         categoryId,
+        imageId,
         visible,
         available,
         sortOrder: await nextSortOrder(categoryId),
@@ -73,11 +96,22 @@ export async function updateDishAction(input: unknown): Promise<ActionResult> {
 
   const parsed = updateDishSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
-  const { id, name, description, price, categoryId, tagIds, visible, available } = parsed.data;
+  const { id, name, description, price, categoryId, tagIds, imageId, visible, available } =
+    parsed.data;
+
+  let previousImageId: string | null = null;
 
   try {
-    const current = await prisma.dish.findUnique({ where: { id }, select: { categoryId: true } });
+    const current = await prisma.dish.findUnique({
+      where: { id },
+      select: { categoryId: true, imageId: true },
+    });
     if (!current) return { ok: false, error: "El plato ya no existe" };
+    previousImageId = current.imageId;
+
+    if (imageId && imageId !== current.imageId && !(await imageIsFree(imageId))) {
+      return { ok: false, error: IMAGE_UNAVAILABLE };
+    }
 
     // Si cambia de categoría, pasa al final de la nueva (undefined = no se modifica)
     const sortOrder =
@@ -90,6 +124,7 @@ export async function updateDishAction(input: unknown): Promise<ActionResult> {
         description,
         priceCents: price,
         categoryId,
+        imageId,
         visible,
         available,
         sortOrder,
@@ -98,6 +133,11 @@ export async function updateDishAction(input: unknown): Promise<ActionResult> {
     });
   } catch (e) {
     return dbError(e);
+  }
+
+  // Si la foto cambió o se quitó, la anterior se borra de la base y del disco
+  if (previousImageId && previousImageId !== imageId) {
+    await deleteImageById(previousImageId).catch((e) => console.error(e));
   }
 
   refresh();
@@ -184,7 +224,12 @@ export async function deleteDishAction(input: unknown): Promise<ActionResult> {
   const { id } = parsed.data;
 
   try {
+    const dish = await prisma.dish.findUnique({ where: { id }, select: { imageId: true } });
     await prisma.dish.delete({ where: { id } });
+
+    if (dish?.imageId) {
+      await deleteImageById(dish.imageId).catch((e) => console.error(e));
+    }
   } catch (e) {
     return dbError(e);
   }

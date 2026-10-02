@@ -4,8 +4,10 @@
 import { useState, useTransition } from "react";
 import { createDishAction, updateDishAction } from "@/actions/dishes";
 import { notify } from "@/lib/notify";
+import type { ImageInfo } from "@/lib/media";
 import { Spinner } from "@/components/ui/spinner";
 import { inputClass, primaryButton, secondaryButton } from "@/components/ui/styles";
+import { ImageField } from "./image-field";
 import type { CategoryOption, DishRow, TagOption } from "./types";
 
 export function DishForm({
@@ -30,6 +32,7 @@ export function DishForm({
   const [price, setPrice] = useState(dish ? (dish.priceCents / 100).toFixed(2) : "");
   const [categoryId, setCategoryId] = useState(dish?.categoryId ?? defaultCategoryId);
   const [tagIds, setTagIds] = useState<string[]>(dish?.tagIds ?? []);
+  const [image, setImage] = useState<ImageInfo | null>(dish?.image ?? null);
   const [visible, setVisible] = useState(dish?.visible ?? true);
   const [available, setAvailable] = useState(dish?.available ?? true);
   const [pending, startTransition] = useTransition();
@@ -42,7 +45,16 @@ export function DishForm({
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    const payload = { name, description, price, categoryId, tagIds, visible, available };
+    const payload = {
+      name,
+      description,
+      price,
+      categoryId,
+      tagIds,
+      imageId: image?.id ?? null,
+      visible,
+      available,
+    };
     startTransition(async () => {
       const result = dish
         ? await updateDishAction({ id: dish.id, ...payload })
@@ -67,6 +79,8 @@ export function DishForm({
           className={inputClass}
         />
       </div>
+
+      <ImageField value={image} onChange={setImage} />
 
       <div className="grid grid-cols-2 gap-3">
         <div>

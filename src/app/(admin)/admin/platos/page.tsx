@@ -1,6 +1,7 @@
 ﻿//src/app/(admin)/admin/platos/page.tsx
 import { prisma } from "@/lib/prisma";
 import { requireSection } from "@/lib/auth";
+import { toImageInfo } from "@/lib/media";
 import { DishesManager } from "@/components/admin/dishes/dishes-manager";
 
 export default async function PlatosPage() {
@@ -17,7 +18,7 @@ export default async function PlatosPage() {
     }),
     prisma.dish.findMany({
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-      include: { tags: { select: { id: true } } },
+      include: { tags: { select: { id: true } }, image: true },
     }),
     prisma.restaurantSettings.findUnique({
       where: { id: 1 },
@@ -39,6 +40,7 @@ export default async function PlatosPage() {
         available: d.available,
         categoryId: d.categoryId,
         tagIds: d.tags.map((t) => t.id),
+        image: d.image ? toImageInfo(d.image) : null,
       }))}
     />
   );

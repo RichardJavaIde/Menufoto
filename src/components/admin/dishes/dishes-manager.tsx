@@ -2,6 +2,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import { DishThumb } from "@/components/ui/dish-image";
 import { toast } from "sonner";
 import {
   Plus,
@@ -178,9 +179,10 @@ export function DishesManager({
                     return (
                       <li
                         key={d.id}
-                        className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
+                        className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center"
                       >
-                        <div className="min-w-0">
+                        <DishThumb image={d.image} />
+                        <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
                             <span
                               className={`font-medium ${d.visible ? "" : "text-neutral-400"}`}
