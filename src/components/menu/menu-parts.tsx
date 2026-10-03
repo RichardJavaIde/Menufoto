@@ -106,7 +106,7 @@ export function MenuSection({
   placeholderImages?: boolean;
 }) {
   return (
-    <section className="mt-section">
+     <section id={`cat-${category.id}`} className="mt-section">
       <CategoryHeading name={category.name} description={category.description} index={index} />
       <div className="mt-dishes">
         {category.dishes.map((d) => (

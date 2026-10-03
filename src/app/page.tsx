@@ -1,41 +1,71 @@
 //src/app/page.tsx
-import { prisma } from "@/lib/prisma";
-import { formatPrice } from "@/lib/format";
+import type { Metadata, Viewport } from "next";
+import { getMenuData } from "@/lib/menu-data";
+import { resolveTheme } from "@/themes/resolve";
+import { fontVariableClasses } from "@/themes/fonts";
+import { MenuTheme } from "@/components/menu/menu-theme";
+import { MenuHeader } from "@/components/menu/menu-header";
+import { MenuBody } from "@/components/menu/menu-parts";
+import { MenuFooter } from "@/components/menu/menu-footer";
+import { CategoryNav } from "@/components/menu/category-nav";
 
-export const dynamic = "force-dynamic";
+// Se regenera sola cada 5 minutos; además, cada cambio en el panel la actualiza al instante
+export const revalidate = 300;
 
-export default async function Home() {
-  const [users, tags, categories] = await Promise.all([
-    prisma.user.count(),
-    prisma.tag.count(),
-    prisma.category.findMany({
-      orderBy: { sortOrder: "asc" },
-      include: { dishes: { orderBy: { sortOrder: "asc" } } },
-    }),
-  ]);
+export async function generateMetadata(): Promise<Metadata> {
+  const { restaurant } = await getMenuData();
+  return {
+    title: `${restaurant.name} · Menú`,
+    description:
+      restaurant.description ?? restaurant.tagline ?? `Carta digital de ${restaurant.name}`,
+  };
+}
+
+export async function generateViewport(): Promise<Viewport> {
+  const { appearance } = await getMenuData();
+  return { themeColor: resolveTheme(appearance).colors.background };
+}
+
+export default async function PublicMenuPage() {
+  const { restaurant, appearance, hours, categories } = await getMenuData();
+
+  const resolved = resolveTheme(appearance);
+  const fontClasses = fontVariableClasses([resolved.fonts.heading, resolved.fonts.body]);
 
   return (
-    <main className="mx-auto max-w-xl p-8">
-      <h1 className="text-2xl font-semibold">Menú Digital Visual</h1>
-      <p className="mt-2 text-sm text-neutral-600">
-        Usuarios: {users} · Etiquetas: {tags} · Categorías: {categories.length}
-      </p>
-      {categories.map((c) => (
-        <section key={c.id} className="mt-6">
-          <h2 className="text-lg font-medium">{c.name}</h2>
-          <ul className="mt-2 space-y-1">
-            {c.dishes.map((d) => (
-              <li key={d.id} className="flex justify-between">
-                <span>
-                  {d.name}
-                  {!d.available && " (agotado)"}
-                </span>
-                <span>{formatPrice(d.priceCents)}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ))}
-    </main>
+    <div className={fontClasses}>
+      <MenuTheme resolved={resolved} className="min-h-screen">
+        <MenuHeader
+          name={restaurant.name}
+          tagline={restaurant.tagline}
+          description={restaurant.description}
+          logo={restaurant.logo}
+          cover={restaurant.cover}
+        />
+
+        {categories.length > 1 && (
+          <CategoryNav items={categories.map((c) => ({ id: c.id, name: c.name }))} />
+        )}
+
+        <main className="mt-container">
+          {categories.length === 0 ? (
+            <p className="mt-empty">Pronto publicaremos nuestra carta.</p>
+          ) : (
+            <MenuBody categories={categories} symbol={restaurant.currencySymbol} />
+          )}
+        </main>
+
+        <MenuFooter
+          address={restaurant.address}
+          phone={restaurant.phone}
+          whatsapp={restaurant.whatsapp}
+          email={restaurant.email}
+          instagram={restaurant.instagram}
+          facebook={restaurant.facebook}
+          website={restaurant.website}
+          hours={hours}
+        />
+      </MenuTheme>
+    </div>
   );
 }
