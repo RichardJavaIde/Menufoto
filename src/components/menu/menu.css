@@ -550,15 +550,29 @@
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--m-border);
 }
-.mt-nav-list {
-  position: relative;
+.mt-nav-bar {
   display: flex;
+  align-items: center;
   gap: 0.5rem;
   max-width: 46rem;
   margin-inline: auto;
-  padding: 0.65rem 1.25rem;
+  padding: 0.6rem 1.25rem;
+}
+.mt-nav-list {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  gap: 0.5rem;
   overflow-x: auto;
   scrollbar-width: none;
+}
+/* Los márgenes automáticos centran los botones si caben, y si sobran dejan deslizar sin cortar */
+.mt-nav-list > li:first-child {
+  margin-left: auto;
+}
+.mt-nav-list > li:last-child {
+  margin-right: auto;
 }
 .mt-nav-list::-webkit-scrollbar {
   display: none;
@@ -643,4 +657,80 @@
   padding: 4rem 1rem;
   text-align: center;
   color: var(--m-muted);
+}
+/* ===== Búsqueda ===== */
+.mt-nav-spacer,
+.mt-icon-btn {
+  flex: none;
+  width: 2.4rem;
+  height: 2.4rem;
+}
+.mt-icon-btn {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  color: var(--m-text);
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--m-border);
+  border-radius: calc(var(--m-radius) * 2.5);
+}
+.mt-icon-btn svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+.mt-search {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+.mt-search-field {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  height: 2.4rem;
+  padding: 0 0.9rem;
+  color: var(--m-muted);
+  background: var(--m-surface);
+  border: 1px solid var(--m-border);
+  border-radius: calc(var(--m-radius) * 2.5);
+}
+.mt-search-field:focus-within {
+  border-color: var(--m-primary);
+}
+.mt-search-field svg {
+  flex: none;
+  width: 1.1rem;
+  height: 1.1rem;
+}
+.mt-search-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  font: inherit;
+  font-size: 1rem; /* 16px evita el zoom automático en iPhone */
+  color: var(--m-text);
+  background: transparent;
+  border: 0;
+  outline: 0;
+}
+.mt-search-input::placeholder {
+  color: var(--m-muted);
+}
+
+/* Mientras se busca, los separadores sobran */
+.mt-root .mt-menu[data-searching] {
+  gap: calc(var(--m-gap) * 1.5);
+}
+.mt-menu[data-searching] .mt-divider {
+  display: none;
+}
+
+.mt-root [hidden] {
+  display: none !important;
+}
+.mt-container {
+  scroll-margin-top: 4rem;
 }

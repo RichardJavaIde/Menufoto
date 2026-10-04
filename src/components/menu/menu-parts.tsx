@@ -1,6 +1,7 @@
 //src/components/menu/menu-parts.tsx
 import { formatPrice } from "@/lib/format";
 import { mediaSrcSet, mediaUrl } from "@/lib/media";
+import { normalizeText } from "@/lib/search";
 import type { MenuCategory, MenuDish } from "./types";
 
 export function Divider() {
@@ -36,17 +37,31 @@ export function CategoryHeading({
 export function DishItem({
   dish,
   symbol,
+  categoryName = "",
   placeholder = false,
 }: {
   dish: MenuDish;
   symbol: string;
+  categoryName?: string;
   placeholder?: boolean;
 }) {
   const hasImage = Boolean(dish.image) || placeholder;
 
+  // Texto sobre el que busca el menú público (ya sin tildes ni mayúsculas)
+  const searchText = normalizeText(
+    [
+      dish.name,
+      dish.description ?? "",
+      categoryName,
+      ...dish.tags.map((t) => t.name),
+      dish.available ? "" : "agotado",
+    ].join(" ")
+  );
+
   return (
     <article
       className="mt-dish"
+      data-search={searchText}
       data-has-image={hasImage ? "" : undefined}
       data-soldout={!dish.available ? "" : undefined}
     >
@@ -106,11 +121,17 @@ export function MenuSection({
   placeholderImages?: boolean;
 }) {
   return (
-     <section id={`cat-${category.id}`} className="mt-section">
+    <section id={`cat-${category.id}`} className="mt-section">
       <CategoryHeading name={category.name} description={category.description} index={index} />
       <div className="mt-dishes">
         {category.dishes.map((d) => (
-          <DishItem key={d.id} dish={d} symbol={symbol} placeholder={placeholderImages} />
+          <DishItem
+            key={d.id}
+            dish={d}
+            symbol={symbol}
+            categoryName={category.name}
+            placeholder={placeholderImages}
+          />
         ))}
       </div>
     </section>

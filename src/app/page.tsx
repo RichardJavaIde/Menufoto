@@ -43,15 +43,18 @@ export default async function PublicMenuPage() {
           cover={restaurant.cover}
         />
 
-        {categories.length > 1 && (
+        {categories.length > 0 && (
           <CategoryNav items={categories.map((c) => ({ id: c.id, name: c.name }))} />
         )}
 
-        <main className="mt-container">
+                <main className="mt-container">
           {categories.length === 0 ? (
             <p className="mt-empty">Pronto publicaremos nuestra carta.</p>
           ) : (
-            <MenuBody categories={categories} symbol={restaurant.currencySymbol} />
+            <>
+              <MenuBody categories={categories} symbol={restaurant.currencySymbol} />
+              <p id="mt-no-results" className="mt-empty" role="status" hidden />
+            </>
           )}
         </main>
 
