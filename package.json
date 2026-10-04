@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "backup": "powershell -ExecutionPolicy Bypass -File scripts/backup.ps1"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

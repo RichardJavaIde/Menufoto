@@ -8,6 +8,7 @@ import { MenuHeader } from "@/components/menu/menu-header";
 import { MenuBody } from "@/components/menu/menu-parts";
 import { MenuFooter } from "@/components/menu/menu-footer";
 import { CategoryNav } from "@/components/menu/category-nav";
+import { RestaurantJsonLd } from "@/components/menu/json-ld";
 
 // Se regenera sola cada 5 minutos; además, cada cambio en el panel la actualiza al instante
 export const revalidate = 300;
@@ -34,6 +35,12 @@ export default async function PublicMenuPage() {
 
   return (
     <div className={fontClasses}>
+      <RestaurantJsonLd
+        name={restaurant.name}
+        description={restaurant.description}
+        address={restaurant.address}
+        phone={restaurant.phone}
+      />
       <MenuTheme resolved={resolved} className="min-h-screen">
         <MenuHeader
           name={restaurant.name}
