@@ -6,9 +6,9 @@ export type HourRow = {
   closed: boolean;
 };
 
-const DAY_NAMES = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
-const DISPLAY_ORDER = [1, 2, 3, 4, 5, 6, 0]; // empieza en lunes
 
+export const DAY_NAMES = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+export const DISPLAY_ORDER = [1, 2, 3, 4, 5, 6, 0]; // empieza en lunes
 // "22:00" → "10:00 p. m."
 export function formatTime(value: string) {
   const [h, m] = value.split(":").map(Number);

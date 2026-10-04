@@ -136,3 +136,12 @@ export async function cleanupOrphanImages() {
   });
   for (const o of orphans) await deleteImageById(o.id);
 }
+
+// Una foto se puede asignar solo si existe y no la usa ningún plato, el logo ni la portada
+export async function isImageFree(id: string) {
+  const found = await prisma.image.findFirst({
+    where: { id, dishes: { none: {} }, logoOf: { none: {} }, coverOf: { none: {} } },
+    select: { id: true },
+  });
+  return found !== null;
+}

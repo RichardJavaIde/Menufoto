@@ -13,28 +13,28 @@ import { cropAspect, mediaUrl, type ImageInfo } from "@/lib/media";
 const ACCEPTED = ["image/jpeg", "image/png", "image/webp"];
 const MAX_BYTES = 8 * 1024 * 1024;
 
-const ASPECTS = [
+export type AspectOption = { label: string; value: number };
+
+export const DEFAULT_ASPECTS: AspectOption[] = [
   { label: "4:3", value: 4 / 3 },
   { label: "1:1", value: 1 },
   { label: "16:9", value: 16 / 9 },
   { label: "3:4", value: 3 / 4 },
 ];
 
-const round = (v: number) => Math.round(v * 10000) / 10000;
+const round4 = (v: number) => Math.round(v * 10000) / 10000;
 
 function toCrop(area: Area) {
-  const x = Math.min(100, Math.max(0, round(area.x)));
-  const y = Math.min(100, Math.max(0, round(area.y)));
   return {
-    x,
-    y,
-    width: Math.min(100, Math.max(1, round(area.width))),
-    height: Math.min(100, Math.max(1, round(area.height))),
+    x: Math.min(100, Math.max(0, round4(area.x))),
+    y: Math.min(100, Math.max(0, round4(area.y))),
+    width: Math.min(100, Math.max(1, round4(area.width))),
+    height: Math.min(100, Math.max(1, round4(area.height))),
   };
 }
 
-function nearestAspect(value: number) {
-  return ASPECTS.reduce((best, a) =>
+function nearestAspect(aspects: AspectOption[], value: number) {
+  return aspects.reduce((best, a) =>
     Math.abs(a.value - value) < Math.abs(best.value - value) ? a : best
   ).value;
 }
@@ -46,6 +46,8 @@ type EditorState =
 
 function ImageCropper({
   src,
+  aspects,
+  round,
   initialAspect,
   initialArea,
   busy,
@@ -54,6 +56,8 @@ function ImageCropper({
   onCancel,
 }: {
   src: string;
+  aspects: AspectOption[];
+  round: boolean;
   initialAspect?: number;
   initialArea?: Area;
   busy: boolean;
@@ -63,7 +67,7 @@ function ImageCropper({
 }) {
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
-  const [aspect, setAspect] = useState(initialAspect ?? 4 / 3);
+  const [aspect, setAspect] = useState(initialAspect ?? aspects[0].value);
   const [area, setArea] = useState<Area | null>(null);
 
   // Escape cierra solo este editor, no el formulario que está debajo
@@ -89,6 +93,7 @@ function ImageCropper({
             crop={crop}
             zoom={zoom}
             aspect={aspect}
+            cropShape={round ? "round" : "rect"}
             initialCroppedAreaPercentages={initialArea}
             onCropChange={setCrop}
             onZoomChange={setZoom}
@@ -96,23 +101,25 @@ function ImageCropper({
           />
         </div>
 
-        <div className="mt-4 flex flex-wrap gap-2">
-          {ASPECTS.map((a) => (
-            <button
-              key={a.label}
-              type="button"
-              onClick={() => setAspect(a.value)}
-              aria-pressed={aspect === a.value}
-              className={`rounded-md px-3 py-1 text-sm ${
-                aspect === a.value
-                  ? "bg-neutral-900 text-white"
-                  : "bg-neutral-100 text-neutral-800 hover:bg-neutral-200"
-              }`}
-            >
-              {a.label}
-            </button>
-          ))}
-        </div>
+        {aspects.length > 1 && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {aspects.map((a) => (
+              <button
+                key={a.label}
+                type="button"
+                onClick={() => setAspect(a.value)}
+                aria-pressed={aspect === a.value}
+                className={`rounded-md px-3 py-1 text-sm ${
+                  aspect === a.value
+                    ? "bg-neutral-900 text-white"
+                    : "bg-neutral-100 text-neutral-800 hover:bg-neutral-200"
+                }`}
+              >
+                {a.label}
+              </button>
+            ))}
+          </div>
+        )}
 
         <label className="mt-4 block text-sm font-medium">
           Zoom
@@ -153,9 +160,21 @@ function ImageCropper({
 export function ImageField({
   value,
   onChange,
+  label = "Fotografía",
+  hint = "JPG, PNG o WebP · máximo 8 MB · mínimo 400 px por lado.",
+  aspects = DEFAULT_ASPECTS,
+  round = false,
+  previewWidth = "w-40",
+  uploadLabel = "Subir foto",
 }: {
   value: ImageInfo | null;
   onChange: (value: ImageInfo | null) => void;
+  label?: string;
+  hint?: string;
+  aspects?: AspectOption[];
+  round?: boolean;
+  previewWidth?: string;
+  uploadLabel?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [editor, setEditor] = useState<EditorState>(null);
@@ -211,7 +230,7 @@ export function ImageField({
       onChange(data as ImageInfo);
       toast.success(
         editor.mode === "upload"
-          ? "Foto lista. Guarda el plato para aplicarla."
+          ? "Foto lista. Guarda los cambios para aplicarla."
           : "Recorte actualizado"
       );
       closeEditor();
@@ -225,7 +244,7 @@ export function ImageField({
   return (
     <div>
       <p className="block text-sm font-medium">
-        Fotografía <span className="font-normal text-neutral-500">(opcional)</span>
+        {label} <span className="font-normal text-neutral-500">(opcional)</span>
       </p>
 
       <div className="mt-2 flex items-start gap-4">
@@ -233,12 +252,18 @@ export function ImageField({
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={mediaUrl(value.key, 480)}
-            alt="Fotografía del plato"
-            style={{ aspectRatio: cropAspect(value) }}
-            className="w-40 rounded-lg object-cover ring-1 ring-neutral-200"
+            alt={label}
+            style={{ aspectRatio: round ? 1 : cropAspect(value) }}
+            className={`${previewWidth} object-cover ring-1 ring-neutral-200 ${
+              round ? "rounded-full" : "rounded-lg"
+            }`}
           />
         ) : (
-          <div className="flex h-28 w-40 items-center justify-center rounded-lg border border-dashed border-neutral-300 text-neutral-400">
+          <div
+            className={`flex items-center justify-center border border-dashed border-neutral-300 text-neutral-400 ${previewWidth} ${
+              round ? "aspect-square rounded-full" : "h-28 rounded-lg"
+            }`}
+          >
             <ImageIcon className="h-6 w-6" />
           </div>
         )}
@@ -246,7 +271,7 @@ export function ImageField({
         <div className="flex flex-col items-start gap-2">
           <button type="button" onClick={() => inputRef.current?.click()} className={secondaryButton}>
             {value ? <RefreshCw className="h-4 w-4" /> : <ImagePlus className="h-4 w-4" />}
-            {value ? "Cambiar" : "Subir foto"}
+            {value ? "Cambiar" : uploadLabel}
           </button>
 
           {value && (
@@ -265,16 +290,14 @@ export function ImageField({
                 className="inline-flex items-center gap-2 px-1 text-sm text-red-600 hover:underline"
               >
                 <Trash2 className="h-4 w-4" />
-                Quitar foto
+                Quitar
               </button>
             </>
           )}
         </div>
       </div>
 
-      <p className="mt-2 text-xs text-neutral-500">
-        JPG, PNG o WebP · máximo 8 MB · mínimo 400 px por lado.
-      </p>
+      <p className="mt-2 text-xs text-neutral-500">{hint}</p>
 
       <input
         ref={inputRef}
@@ -287,8 +310,12 @@ export function ImageField({
       {editor && (
         <ImageCropper
           src={editor.src}
+          aspects={aspects}
+          round={round}
           initialAspect={
-            editor.mode === "recrop" && value ? nearestAspect(cropAspect(value)) : undefined
+            editor.mode === "recrop" && value
+              ? nearestAspect(aspects, cropAspect(value))
+              : aspects[0].value
           }
           initialArea={
             editor.mode === "recrop" && value
