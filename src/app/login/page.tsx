@@ -21,7 +21,7 @@ export default async function LoginPage() {
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-neutral-50 p-4">
-      <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-sm ring-1 ring-neutral-200">
+      <div className="w-full max-w-sm rounded-xl bg-white p-6 text-neutral-900 shadow-sm ring-1 ring-neutral-200">
         <div className="mb-6 flex flex-col items-center text-center">
           {logoUrl && (
             // eslint-disable-next-line @next/next/no-img-element
