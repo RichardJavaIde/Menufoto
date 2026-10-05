@@ -11,9 +11,9 @@ export type ImageInfo = {
 };
 
 export type MediaSize = 480 | 960 | "src";
-
+const MEDIA_BASE = process.env.NEXT_PUBLIC_MEDIA_BASE_URL ?? "";
 export function mediaUrl(key: string, size: MediaSize) {
-  return `/media/${key}-${size}.webp`;
+  return `${MEDIA_BASE}/media/${key}-${size}.webp`;
 }
 
 export function mediaSrcSet(key: string) {

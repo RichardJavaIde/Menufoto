@@ -9,6 +9,7 @@ import { ImagePlus, Crop as CropIcon, Trash2, RefreshCw, ImageIcon } from "lucid
 import { Spinner } from "@/components/ui/spinner";
 import { primaryButton, secondaryButton } from "@/components/ui/styles";
 import { cropAspect, mediaUrl, type ImageInfo } from "@/lib/media";
+import { shrinkForUpload } from "@/lib/client-image";
 
 const ACCEPTED = ["image/jpeg", "image/png", "image/webp"];
 const MAX_BYTES = 8 * 1024 * 1024;
@@ -210,7 +211,7 @@ export function ImageField({
       let res: Response;
       if (editor.mode === "upload") {
         const form = new FormData();
-        form.append("file", editor.file);
+        form.append("file", await shrinkForUpload(editor.file));
         form.append("crop", JSON.stringify(crop));
         res = await fetch("/api/images", { method: "POST", body: form });
       } else {

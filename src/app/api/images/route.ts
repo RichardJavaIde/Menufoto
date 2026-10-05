@@ -12,6 +12,7 @@ import { cropSchema } from "@/lib/schemas/image";
 import { toImageInfo } from "@/lib/media";
 
 export const runtime = "nodejs";
+export const maxDuration = 30;
 
 export async function POST(req: Request) {
   const user = await getCurrentUser();

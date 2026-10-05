@@ -1,13 +1,11 @@
 //src/lib/media.ts
 import { randomBytes } from "node:crypto";
-import { promises as fs } from "node:fs";
-import path from "node:path";
 import sharp from "sharp";
+import { put, del } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
-import type { Crop} from "@/lib/schemas/image";
+import { mediaUrl } from "@/lib/media";
+import type { Crop } from "@/lib/schemas/image";
 
-type ImageMetadata = Awaited<ReturnType<ReturnType<typeof sharp>["metadata"]>>;
-export const UPLOAD_DIR = path.join(process.cwd(), "uploads");
 export const MAX_UPLOAD_BYTES = 8 * 1024 * 1024; // 8 MB
 export const VARIANT_WIDTHS = [480, 960] as const;
 
@@ -19,9 +17,7 @@ const ALLOWED_FORMATS = new Set(["jpeg", "png", "webp"]);
 
 export class ImageError extends Error {}
 
-export function filePath(name: string) {
-  return path.join(UPLOAD_DIR, name);
-}
+type ImageMetadata = Awaited<ReturnType<ReturnType<typeof sharp>["metadata"]>>;
 
 function newKey() {
   return randomBytes(12).toString("hex"); // 24 caracteres hexadecimales
@@ -37,22 +33,36 @@ function cropToPixels(crop: Crop, w: number, h: number) {
   return { left, top, width, height };
 }
 
+// Guarda un archivo en Vercel Blob con cache de un año (la clave cambia si la foto cambia)
+async function putFile(name: string, data: Buffer) {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    throw new ImageError("Falta configurar BLOB_READ_WRITE_TOKEN para subir fotos");
+  }
+  await put(`media/${name}`, data, {
+    access: "public",
+    addRandomSuffix: false,
+    contentType: "image/webp",
+    cacheControlMaxAge: 60 * 60 * 24 * 365,
+  });
+}
+
 async function writeVariants(key: string, source: Buffer, w: number, h: number, crop: Crop) {
   const region = cropToPixels(crop, w, h);
   await Promise.all(
-    VARIANT_WIDTHS.map((width) =>
-      sharp(source)
+    VARIANT_WIDTHS.map(async (width) => {
+      const out = await sharp(source)
         .extract(region)
         .resize({ width, withoutEnlargement: true })
         .webp({ quality: 78 })
-        .toFile(filePath(`${key}-${width}.webp`))
-    )
+        .toBuffer();
+      await putFile(`${key}-${width}.webp`, out);
+    })
   );
 }
 
 export async function removeFiles(key: string) {
-  const names = [`${key}-src.webp`, ...VARIANT_WIDTHS.map((w) => `${key}-${w}.webp`)];
-  await Promise.all(names.map((n) => fs.rm(filePath(n), { force: true })));
+  const urls = [mediaUrl(key, "src"), ...VARIANT_WIDTHS.map((w) => mediaUrl(key, w))];
+  await del(urls).catch((e) => console.error("No se pudieron borrar archivos de Blob", e));
 }
 
 export async function processUpload(buffer: Buffer, crop: Crop) {
@@ -87,10 +97,9 @@ export async function processUpload(buffer: Buffer, crop: Crop) {
     .toBuffer({ resolveWithObject: true });
 
   const key = newKey();
-  await fs.mkdir(UPLOAD_DIR, { recursive: true });
-  await fs.writeFile(filePath(`${key}-src.webp`), data);
 
   try {
+    await putFile(`${key}-src.webp`, data);
     await writeVariants(key, data, info.width, info.height, crop);
   } catch (e) {
     await removeFiles(key);
@@ -104,15 +113,23 @@ export async function processUpload(buffer: Buffer, crop: Crop) {
 export async function recropImage(oldKey: string, width: number, height: number, crop: Crop) {
   let source: Buffer;
   try {
-    source = await fs.readFile(filePath(`${oldKey}-src.webp`));
+    const res = await fetch(mediaUrl(oldKey, "src"), { cache: "no-store" });
+    if (!res.ok) throw new Error(String(res.status));
+    source = Buffer.from(await res.arrayBuffer());
   } catch {
     throw new ImageError("No se encontró el archivo de la imagen. Súbela de nuevo.");
   }
 
   const key = newKey();
-  await writeVariants(key, source, width, height, crop);
-  await fs.rename(filePath(`${oldKey}-src.webp`), filePath(`${key}-src.webp`));
-  await Promise.all(VARIANT_WIDTHS.map((w) => fs.rm(filePath(`${oldKey}-${w}.webp`), { force: true })));
+  try {
+    await putFile(`${key}-src.webp`, source);
+    await writeVariants(key, source, width, height, crop);
+  } catch (e) {
+    await removeFiles(key);
+    throw e;
+  }
+
+  await removeFiles(oldKey);
   return key;
 }
 
