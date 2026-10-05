@@ -744,3 +744,142 @@
 .mt-container {
   scroll-margin-top: 4rem;
 }
+/* ===== Visor de fotos ===== */
+.mt-dish-media[data-zoom-src] {
+  cursor: zoom-in;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.mt-dish-media[data-zoom-src] .mt-dish-img {
+  transition: filter 0.2s ease;
+}
+.mt-dish-media[data-zoom-src]:hover .mt-dish-img {
+  filter: brightness(1.06);
+}
+.mt-dish-media[data-zoom-src]:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+}
+
+/* Bloquea el desplazamiento de la página mientras el visor está abierto */
+html:has(.mt-zoom[open]) {
+  overflow: hidden;
+}
+
+.mt-zoom {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  background: transparent;
+  color: #fff;
+}
+.mt-zoom[open] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.mt-zoom::backdrop {
+  background: rgb(0 0 0 / 0.84);
+  backdrop-filter: blur(4px);
+}
+
+.mt-zoom-box {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.85rem;
+  min-width: 12rem;
+  min-height: 12rem;
+  max-width: min(94vw, 960px);
+  max-height: 94vh;
+  margin: 0;
+}
+.mt-zoom-img {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: calc(94vh - 9rem);
+  object-fit: contain;
+  border-radius: 0.75rem;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+.mt-zoom-box[data-loaded] .mt-zoom-img {
+  opacity: 1;
+}
+
+/* Indicador de carga mientras llega la foto grande */
+.mt-zoom-box:not([data-loaded])::before {
+  content: "";
+  position: absolute;
+  top: 3rem;
+  left: 50%;
+  width: 2rem;
+  height: 2rem;
+  margin-left: -1rem;
+  border: 3px solid rgb(255 255 255 / 0.25);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: mt-zoom-spin 0.8s linear infinite;
+}
+@keyframes mt-zoom-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mt-zoom-box:not([data-loaded])::before {
+    animation: none;
+  }
+  .mt-zoom-img {
+    transition: none;
+  }
+}
+
+.mt-zoom-cap {
+  max-width: 36rem;
+  padding: 0 0.5rem;
+  text-align: center;
+}
+.mt-zoom-name {
+  display: block;
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+.mt-zoom-price {
+  display: block;
+  margin-top: 0.15rem;
+  font-weight: 600;
+  opacity: 0.9;
+}
+.mt-zoom-desc {
+  margin: 0.45rem 0 0;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: rgb(255 255 255 / 0.8);
+}
+
+.mt-zoom-close {
+  position: fixed;
+  top: 0.75rem;
+  right: 0.75rem;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 0;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.16);
+  color: #fff;
+  font-size: 1.75rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.mt-zoom-close:hover {
+  background: rgb(255 255 255 / 0.28);
+}

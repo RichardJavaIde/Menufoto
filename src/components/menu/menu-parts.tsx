@@ -66,7 +66,14 @@ export function DishItem({
       data-soldout={!dish.available ? "" : undefined}
     >
       {hasImage && (
-        <div className="mt-dish-media">
+        <div className="mt-dish-media"
+          data-zoom-src={dish.image ? mediaUrl(dish.image.key, 960) : undefined}
+          data-zoom-name={dish.image ? dish.name : undefined}
+          data-zoom-price={dish.image ? formatPrice(dish.priceCents, symbol) : undefined}
+          data-zoom-desc={dish.image ? (dish.description ?? "") : undefined}
+          role={dish.image ? "button" : undefined}
+          tabIndex={dish.image ? 0 : undefined}
+          aria-label={dish.image ? `Ver foto de ${dish.name}` : undefined}>
           {dish.image ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img

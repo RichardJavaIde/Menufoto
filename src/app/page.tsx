@@ -9,6 +9,7 @@ import { MenuBody } from "@/components/menu/menu-parts";
 import { MenuFooter } from "@/components/menu/menu-footer";
 import { CategoryNav } from "@/components/menu/category-nav";
 import { RestaurantJsonLd } from "@/components/menu/json-ld";
+import { PhotoViewer } from "@/components/menu/photo-viewer";
 
 // Se regenera sola cada 5 minutos; además, cada cambio en el panel la actualiza al instante
 export const revalidate = 300;
@@ -75,6 +76,7 @@ export default async function PublicMenuPage() {
           website={restaurant.website}
           hours={hours}
         />
+        <PhotoViewer />
       </MenuTheme>
     </div>
   );
