@@ -23,9 +23,9 @@ npm run dev
 - **USER**: categorías, platos, etiquetas y código QR.
 
 ## Datos
-Todo el contenido vive en dos lugares que siempre deben respaldarse juntos:
-- `prisma/dev.db` (base de datos SQLite)
-- `uploads/` (fotos)
+- Base de datos: PostgreSQL en Neon (`DATABASE_URL` y `DIRECT_URL`).
+- Fotos: Vercel Blob (`BLOB_READ_WRITE_TOKEN`).
+Ambos servicios guardan su propio historial y respaldos desde sus paneles.
 
 Respaldo: `npm run backup` (crea un ZIP en `backups/`).
 
