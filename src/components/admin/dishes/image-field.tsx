@@ -9,9 +9,10 @@ import { ImagePlus, Crop as CropIcon, Trash2, RefreshCw, ImageIcon } from "lucid
 import { Spinner } from "@/components/ui/spinner";
 import { primaryButton, secondaryButton } from "@/components/ui/styles";
 import { cropAspect, mediaUrl, type ImageInfo } from "@/lib/media";
-import { shrinkForUpload } from "@/lib/client-image";
+import { isSupportedImage, prepareImage } from "@/lib/client-image";
 
-const ACCEPTED = ["image/jpeg", "image/png", "image/webp"];
+// Incluye HEIC/HEIF, el formato de las fotos de iPhone y iPad
+const ACCEPT_ATTR = "image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif";
 const MAX_BYTES = 8 * 1024 * 1024;
 
 export type AspectOption = { label: string; value: number };
@@ -162,7 +163,7 @@ export function ImageField({
   value,
   onChange,
   label = "Fotografía",
-  hint = "JPG, PNG o WebP · máximo 8 MB · mínimo 400 px por lado.",
+  hint = "JPG, PNG, WebP o HEIC (iPhone) · mínimo 400 px por lado.",
   aspects = DEFAULT_ASPECTS,
   round = false,
   previewWidth = "w-40",
@@ -180,26 +181,37 @@ export function ImageField({
   const inputRef = useRef<HTMLInputElement>(null);
   const [editor, setEditor] = useState<EditorState>(null);
   const [busy, setBusy] = useState(false);
+  const [preparing, setPreparing] = useState(false);
 
   function closeEditor() {
     if (editor?.mode === "upload") URL.revokeObjectURL(editor.src);
     setEditor(null);
   }
 
-  function onPick(e: React.ChangeEvent<HTMLInputElement>) {
+  async function onPick(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
 
-    if (!ACCEPTED.includes(file.type)) {
-      toast.error("Formato no permitido. Usa JPG, PNG o WebP");
+    if (!isSupportedImage(file)) {
+      toast.error("Formato no permitido. Usa JPG, PNG, WebP o HEIC");
       return;
     }
-    if (file.size > MAX_BYTES) {
-      toast.error("La imagen supera el máximo de 8 MB");
-      return;
+
+    setPreparing(true);
+    try {
+      // Convierte HEIC (iPhone/iPad) y reduce la foto a 2000 px antes de recortarla
+      const ready = await prepareImage(file);
+      if (ready.size > MAX_BYTES) {
+        toast.error("La imagen sigue siendo demasiado pesada. Prueba con otra foto.");
+        return;
+      }
+      setEditor({ mode: "upload", file: ready, src: URL.createObjectURL(ready) });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "No se pudo leer la foto");
+    } finally {
+      setPreparing(false);
     }
-    setEditor({ mode: "upload", file, src: URL.createObjectURL(file) });
   }
 
   async function confirm(area: Area) {
@@ -211,7 +223,7 @@ export function ImageField({
       let res: Response;
       if (editor.mode === "upload") {
         const form = new FormData();
-        form.append("file", await shrinkForUpload(editor.file));
+        form.append("file", editor.file);
         form.append("crop", JSON.stringify(crop));
         res = await fetch("/api/images", { method: "POST", body: form });
       } else {
@@ -270,9 +282,20 @@ export function ImageField({
         )}
 
         <div className="flex flex-col items-start gap-2">
-          <button type="button" onClick={() => inputRef.current?.click()} className={secondaryButton}>
-            {value ? <RefreshCw className="h-4 w-4" /> : <ImagePlus className="h-4 w-4" />}
-            {value ? "Cambiar" : uploadLabel}
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            disabled={preparing}
+            className={secondaryButton}
+          >
+            {preparing ? (
+              <Spinner className="h-4 w-4" />
+            ) : value ? (
+              <RefreshCw className="h-4 w-4" />
+            ) : (
+              <ImagePlus className="h-4 w-4" />
+            )}
+            {preparing ? "Preparando…" : value ? "Cambiar" : uploadLabel}
           </button>
 
           {value && (
@@ -303,7 +326,7 @@ export function ImageField({
       <input
         ref={inputRef}
         type="file"
-        accept={ACCEPTED.join(",")}
+        accept={ACCEPT_ATTR}
         onChange={onPick}
         className="hidden"
       />
