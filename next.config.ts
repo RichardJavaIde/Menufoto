@@ -1,7 +1,11 @@
 import type { NextConfig } from "next";
 
-// Dirección pública de Vercel Blob. Si hace falta, puedes fijarla a mano con NEXT_PUBLIC_MEDIA_BASE_URL.
+const useBlob =
+  (process.env.STORAGE_DRIVER ?? (process.env.BLOB_READ_WRITE_TOKEN ? "blob" : "local")) === "blob";
+
+// Solo hace falta con Blob. Con almacenamiento en disco las fotos salen de /media en el mismo dominio.
 function mediaBase() {
+  if (!useBlob) return "";
   const explicit = process.env.NEXT_PUBLIC_MEDIA_BASE_URL;
   if (explicit) return explicit.replace(/\/$/, "");
   const storeId = (process.env.BLOB_READ_WRITE_TOKEN ?? "").split("_")[3];
@@ -10,6 +14,8 @@ function mediaBase() {
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // "standalone" lo activa el Dockerfile. En Windows y en Vercel no hace falta.
+  output: process.env.NEXT_OUTPUT === "standalone" ? "standalone" : undefined,
   env: { NEXT_PUBLIC_MEDIA_BASE_URL: mediaBase() },
   async headers() {
     return [
