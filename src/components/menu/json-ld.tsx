@@ -7,7 +7,7 @@ type Props = {
 };
 
 export function RestaurantJsonLd({ name, description, address, phone }: Props) {
-  const base = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "");
+  const base = (process.env.SITE_URL ?? process.env.NEXT_PUBLIC_SITE_URL)?.replace(/\/$/, "");
 
   const data = {
     "@context": "https://schema.org",

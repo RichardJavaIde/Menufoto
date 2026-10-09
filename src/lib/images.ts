@@ -1,9 +1,8 @@
 //src/lib/media.ts
 import { randomBytes } from "node:crypto";
 import sharp from "sharp";
-import { put, del } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
-import { mediaUrl } from "@/lib/media";
+import { saveFile, readFile, deleteFiles } from "@/lib/storage";
 import type { Crop } from "@/lib/schemas/image";
 
 export const MAX_UPLOAD_BYTES = 8 * 1024 * 1024; // 8 MB
@@ -33,19 +32,6 @@ function cropToPixels(crop: Crop, w: number, h: number) {
   return { left, top, width, height };
 }
 
-// Guarda un archivo en Vercel Blob con cache de un año (la clave cambia si la foto cambia)
-async function putFile(name: string, data: Buffer) {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    throw new ImageError("Falta configurar BLOB_READ_WRITE_TOKEN para subir fotos");
-  }
-  await put(`media/${name}`, data, {
-    access: "public",
-    addRandomSuffix: false,
-    contentType: "image/webp",
-    cacheControlMaxAge: 60 * 60 * 24 * 365,
-  });
-}
-
 async function writeVariants(key: string, source: Buffer, w: number, h: number, crop: Crop) {
   const region = cropToPixels(crop, w, h);
   await Promise.all(
@@ -55,14 +41,13 @@ async function writeVariants(key: string, source: Buffer, w: number, h: number, 
         .resize({ width, withoutEnlargement: true })
         .webp({ quality: 78 })
         .toBuffer();
-      await putFile(`${key}-${width}.webp`, out);
+      await saveFile(`${key}-${width}.webp`, out);
     })
   );
 }
 
 export async function removeFiles(key: string) {
-  const urls = [mediaUrl(key, "src"), ...VARIANT_WIDTHS.map((w) => mediaUrl(key, w))];
-  await del(urls).catch((e) => console.error("No se pudieron borrar archivos de Blob", e));
+  await deleteFiles([`${key}-src.webp`, ...VARIANT_WIDTHS.map((w) => `${key}-${w}.webp`)]);
 }
 
 export async function processUpload(buffer: Buffer, crop: Crop) {
@@ -99,7 +84,7 @@ export async function processUpload(buffer: Buffer, crop: Crop) {
   const key = newKey();
 
   try {
-    await putFile(`${key}-src.webp`, data);
+    await saveFile(`${key}-src.webp`, data);
     await writeVariants(key, data, info.width, info.height, crop);
   } catch (e) {
     await removeFiles(key);
@@ -113,16 +98,14 @@ export async function processUpload(buffer: Buffer, crop: Crop) {
 export async function recropImage(oldKey: string, width: number, height: number, crop: Crop) {
   let source: Buffer;
   try {
-    const res = await fetch(mediaUrl(oldKey, "src"), { cache: "no-store" });
-    if (!res.ok) throw new Error(String(res.status));
-    source = Buffer.from(await res.arrayBuffer());
+    source = await readFile(`${oldKey}-src.webp`);
   } catch {
     throw new ImageError("No se encontró el archivo de la imagen. Súbela de nuevo.");
   }
 
   const key = newKey();
   try {
-    await putFile(`${key}-src.webp`, source);
+    await saveFile(`${key}-src.webp`, source);
     await writeVariants(key, source, width, height, crop);
   } catch (e) {
     await removeFiles(key);
