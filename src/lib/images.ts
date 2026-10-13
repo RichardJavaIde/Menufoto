@@ -131,16 +131,23 @@ export async function cleanupOrphanImages() {
       dishes: { none: {} },
       logoOf: { none: {} },
       coverOf: { none: {} },
+      tvSlideImages: { none: {} },
     },
     select: { id: true },
   });
   for (const o of orphans) await deleteImageById(o.id);
 }
 
-// Una foto se puede asignar solo si existe y no la usa ningún plato, el logo ni la portada
+// Una foto se puede asignar solo si existe y no la usa ningún plato, el logo, la portada ni una diapositiva
 export async function isImageFree(id: string) {
   const found = await prisma.image.findFirst({
-    where: { id, dishes: { none: {} }, logoOf: { none: {} }, coverOf: { none: {} } },
+    where: {
+      id,
+      dishes: { none: {} },
+      logoOf: { none: {} },
+      coverOf: { none: {} },
+      tvSlideImages: { none: {} },
+    },
     select: { id: true },
   });
   return found !== null;

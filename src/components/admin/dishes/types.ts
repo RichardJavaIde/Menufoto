@@ -8,6 +8,10 @@ export type DishRow = {
   priceCents: number;
   visible: boolean;
   available: boolean;
+  popular: boolean;
+  offerPriceCents: number | null;
+  offerStart: string | null; // YYYY-MM-DD en la zona del restaurante
+  offerEnd: string | null;
   categoryId: string;
   tagIds: string[];
   image: ImageInfo | null;

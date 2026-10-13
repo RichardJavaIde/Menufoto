@@ -9,7 +9,8 @@ export type Section =
   | "apariencia"
   | "qr"
   | "configuracion"
-  | "usuarios";
+  | "usuarios"
+  | "tv";
 
 // Único lugar donde se define quién entra a cada sección
 const ACCESS: Record<Section, Role[]> = {
@@ -21,6 +22,7 @@ const ACCESS: Record<Section, Role[]> = {
   apariencia: ["ADMIN"],
   configuracion: ["ADMIN"],
   usuarios: ["ADMIN"],
+  tv: ["ADMIN"],
 };
 
 export function canAccess(role: Role, section: Section): boolean {

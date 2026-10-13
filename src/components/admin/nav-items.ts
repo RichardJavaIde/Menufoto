@@ -6,6 +6,7 @@ import {
   Tags,
   Palette,
   QrCode,
+  Tv,
   Settings,
   Users,
   type LucideIcon,
@@ -27,6 +28,7 @@ export const NAV_ITEMS: NavItem[] = [
   { section: "etiquetas", href: "/admin/etiquetas", label: "Etiquetas", icon: Tags },
   { section: "apariencia", href: "/admin/apariencia", label: "Apariencia", icon: Palette },
   { section: "qr", href: "/admin/qr", label: "Código QR", icon: QrCode },
+  { section: "tv", href: "/admin/tv", label: "Pantalla TV", icon: Tv },
   { section: "configuracion", href: "/admin/configuracion", label: "Configuración", icon: Settings },
   { section: "usuarios", href: "/admin/usuarios", label: "Usuarios", icon: Users },
 ];

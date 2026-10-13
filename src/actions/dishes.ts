@@ -6,6 +6,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireSection } from "@/lib/auth";
 import { deleteImageById } from "@/lib/images";
+import { zonedTimeToUtc } from "@/lib/tz";
 import type { ActionResult } from "@/lib/action-result";
 import {
   createDishSchema,
@@ -42,7 +43,28 @@ async function nextSortOrder(categoryId: string) {
   });
   return (last._max.sortOrder ?? -1) + 1;
 }
+async function restaurantTimezone() {
+  const s = await prisma.restaurantSettings.findUnique({
+    where: { id: 1 },
+    select: { timezone: true },
+  });
+  return s?.timezone ?? "America/Santo_Domingo";
+}
 
+// Convierte los datos de oferta del formulario a lo que se guarda en la base
+function offerData(
+  p: { offerPrice: number | null; offerStart: string | null; offerEnd: string | null },
+  timeZone: string
+) {
+  if (p.offerPrice === null) {
+    return { offerPriceCents: null, offerStart: null, offerEnd: null };
+  }
+  return {
+    offerPriceCents: p.offerPrice,
+    offerStart: p.offerStart ? zonedTimeToUtc(p.offerStart, "00:00:00", timeZone) : null,
+    offerEnd: p.offerEnd ? zonedTimeToUtc(p.offerEnd, "23:59:59", timeZone) : null,
+  };
+}
 // Una foto solo se puede asignar si existe y no está en uso por otro plato, el logo o la portada
 async function imageIsFree(imageId: string) {
   const found = await prisma.image.findFirst({
@@ -58,7 +80,8 @@ async function imageIsFree(imageId: string) {
 }
 
 export async function createDishAction(input: unknown): Promise<ActionResult> {
-  await requireSection("platos");
+  const user = await requireSection("platos");
+  const isAdmin = user.role === "ADMIN";
 
   const parsed = createDishSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
@@ -70,6 +93,14 @@ export async function createDishAction(input: unknown): Promise<ActionResult> {
       return { ok: false, error: IMAGE_UNAVAILABLE };
     }
 
+    // Popular y oferta solo los define un ADMIN
+    const tvData = isAdmin
+      ? {
+          popular: parsed.data.popular,
+          ...offerData(parsed.data, await restaurantTimezone()),
+        }
+      : {};
+
     await prisma.dish.create({
       data: {
         name,
@@ -79,6 +110,7 @@ export async function createDishAction(input: unknown): Promise<ActionResult> {
         imageId,
         visible,
         available,
+        ...tvData,
         sortOrder: await nextSortOrder(categoryId),
         tags: { connect: tagIds.map((id) => ({ id })) },
       },
@@ -92,7 +124,8 @@ export async function createDishAction(input: unknown): Promise<ActionResult> {
 }
 
 export async function updateDishAction(input: unknown): Promise<ActionResult> {
-  await requireSection("platos");
+  const user = await requireSection("platos");
+  const isAdmin = user.role === "ADMIN";
 
   const parsed = updateDishSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
@@ -117,6 +150,14 @@ export async function updateDishAction(input: unknown): Promise<ActionResult> {
     const sortOrder =
       current.categoryId !== categoryId ? await nextSortOrder(categoryId) : undefined;
 
+    // Si no es ADMIN, popular y oferta no se tocan
+    const tvData = isAdmin
+      ? {
+          popular: parsed.data.popular,
+          ...offerData(parsed.data, await restaurantTimezone()),
+        }
+      : {};
+
     await prisma.dish.update({
       where: { id },
       data: {
@@ -127,6 +168,7 @@ export async function updateDishAction(input: unknown): Promise<ActionResult> {
         imageId,
         visible,
         available,
+        ...tvData,
         sortOrder,
         tags: { set: tagIds.map((tagId) => ({ id: tagId })) },
       },
@@ -143,7 +185,6 @@ export async function updateDishAction(input: unknown): Promise<ActionResult> {
   refresh();
   return { ok: true, message: "Plato actualizado correctamente" };
 }
-
 export async function toggleDishFlagAction(input: unknown): Promise<ActionResult> {
   await requireSection("platos");
 

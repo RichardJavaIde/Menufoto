@@ -19,6 +19,20 @@ enum ImageFit {
   CONTAIN
 }
 
+// NUEVO: tipos de diapositiva y efectos de transición del modo TV
+enum TvSlideType {
+  OFFERS
+  POPULAR
+  CATEGORY
+  GALLERY
+}
+enum TvEffect {
+  FADE
+  SLIDE
+  ZOOM
+  KENBURNS
+}
+
 model User {
   id           String   @id @default(cuid())
   name         String
@@ -50,6 +64,7 @@ model Image {
   dishes  Dish[]
   logoOf  RestaurantSettings[] @relation("Logo")
   coverOf RestaurantSettings[] @relation("Cover")
+  tvSlideImages TvSlideImage[]
 }
 
 model Category {
@@ -62,6 +77,7 @@ model Category {
   updatedAt   DateTime @updatedAt
 
   dishes Dish[]
+  tvSlides TvSlide[]
 
   @@index([sortOrder])
 }
@@ -77,6 +93,13 @@ model Dish {
   sortOrder   Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  // NUEVO: modo TV. La oferta está activa si hay precio de oferta y la fecha actual cae
+  // dentro del rango (offerStart y offerEnd son opcionales).
+  popular         Boolean   @default(false)
+  offerPriceCents Int?
+  offerStart      DateTime?
+  offerEnd        DateTime?
 
   categoryId String
   category   Category @relation(fields: [categoryId], references: [id])
@@ -123,6 +146,9 @@ model RestaurantSettings {
   currencyCode   String  @default("DOP")
   currencySymbol String  @default("RD$")
 
+  // NUEVO: zona horaria para los horarios del modo TV
+  timezone String @default("America/Santo_Domingo")
+
   logoId  String?
   logo    Image?  @relation("Logo", fields: [logoId], references: [id], onDelete: SetNull)
   coverId String?
@@ -138,4 +164,59 @@ model RestaurantSettings {
   fontBody        String?
 
   updatedAt DateTime @updatedAt
+}
+
+// NUEVO: una pantalla de TV. Se abre en /tv/<token>; el token hace de llave.
+model TvScreen {
+  id         String    @id @default(cuid())
+  name       String
+  token      String    @unique
+  active     Boolean   @default(true)
+  lastSeenAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  slides TvSlide[]
+}
+
+// NUEVO: una diapositiva de la lista de una pantalla
+model TvSlide {
+  id       String      @id @default(cuid())
+  screenId String
+  screen   TvScreen    @relation(fields: [screenId], references: [id], onDelete: Cascade)
+  type     TvSlideType
+  position Int         @default(0)
+  // Segundos en pantalla. En GALLERY es el tiempo de cada imagen.
+  seconds  Int         @default(10)
+  effect   TvEffect    @default(FADE)
+  active   Boolean     @default(true)
+
+  // Horario (opcional). days: bits 0 = domingo ... 6 = sábado. Minutos desde medianoche.
+  // Todo en null = siempre se muestra.
+  days        Int?
+  startMinute Int?
+  endMinute   Int?
+
+  // Solo para CATEGORY
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  // Solo para GALLERY
+  title  String?
+  text   String?
+  images TvSlideImage[]
+
+  @@index([screenId, position])
+}
+
+// NUEVO: imágenes de una diapositiva GALLERY (pasarela)
+model TvSlideImage {
+  id       String  @id @default(cuid())
+  slideId  String
+  slide    TvSlide @relation(fields: [slideId], references: [id], onDelete: Cascade)
+  imageId  String
+  image    Image   @relation(fields: [imageId], references: [id], onDelete: Cascade)
+  position Int     @default(0)
+
+  @@index([slideId, position])
 }

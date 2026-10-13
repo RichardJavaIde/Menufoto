@@ -16,6 +16,7 @@ export function DishForm({
   tags,
   currencySymbol,
   defaultCategoryId,
+  canManageTv,
   onDone,
   onCancel,
 }: {
@@ -24,6 +25,7 @@ export function DishForm({
   tags: TagOption[];
   currencySymbol: string;
   defaultCategoryId: string;
+  canManageTv: boolean;
   onDone: () => void;
   onCancel: () => void;
 }) {
@@ -35,6 +37,12 @@ export function DishForm({
   const [image, setImage] = useState<ImageInfo | null>(dish?.image ?? null);
   const [visible, setVisible] = useState(dish?.visible ?? true);
   const [available, setAvailable] = useState(dish?.available ?? true);
+  const [popular, setPopular] = useState(dish?.popular ?? false);
+  const [offerPrice, setOfferPrice] = useState(
+    dish?.offerPriceCents != null ? (dish.offerPriceCents / 100).toFixed(2) : ""
+  );
+  const [offerStart, setOfferStart] = useState(dish?.offerStart ?? "");
+  const [offerEnd, setOfferEnd] = useState(dish?.offerEnd ?? "");
   const [pending, startTransition] = useTransition();
 
   function toggleTag(id: string) {
@@ -54,6 +62,10 @@ export function DishForm({
       imageId: image?.id ?? null,
       visible,
       available,
+      popular,
+      offerPrice,
+      offerStart: offerPrice.trim() === "" ? "" : offerStart,
+      offerEnd: offerPrice.trim() === "" ? "" : offerEnd,
     };
     startTransition(async () => {
       const result = dish
@@ -185,6 +197,76 @@ export function DishForm({
           Disponible (si lo desmarcas se muestra como “Agotado”)
         </label>
       </div>
+
+      {canManageTv && (
+        <fieldset className="space-y-3 rounded-lg bg-neutral-50 p-4 ring-1 ring-neutral-200">
+          <legend className="px-1 text-sm font-semibold">Promoción y Modo TV</legend>
+
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={popular}
+              onChange={(e) => setPopular(e.target.checked)}
+              className="h-4 w-4"
+            />
+            Plato popular (aparece en la pantalla de populares)
+          </label>
+
+          <div>
+            <label htmlFor="d-offer" className="block text-sm font-medium">
+              Precio en oferta{" "}
+              <span className="font-normal text-neutral-500">
+                (opcional, debe ser menor al precio normal)
+              </span>
+            </label>
+            <div className="relative">
+              <span className="pointer-events-none absolute left-3 top-1/2 mt-0.5 -translate-y-1/2 text-sm text-neutral-500">
+                {currencySymbol}
+              </span>
+              <input
+                id="d-offer"
+                value={offerPrice}
+                onChange={(e) => setOfferPrice(e.target.value)}
+                inputMode="decimal"
+                placeholder="Sin oferta"
+                className={`${inputClass} pl-12`}
+              />
+            </div>
+          </div>
+
+          {offerPrice.trim() !== "" && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label htmlFor="d-offer-start" className="block text-sm font-medium">
+                  Desde <span className="font-normal text-neutral-500">(opcional)</span>
+                </label>
+                <input
+                  id="d-offer-start"
+                  type="date"
+                  value={offerStart}
+                  onChange={(e) => setOfferStart(e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label htmlFor="d-offer-end" className="block text-sm font-medium">
+                  Hasta <span className="font-normal text-neutral-500">(opcional)</span>
+                </label>
+                <input
+                  id="d-offer-end"
+                  type="date"
+                  value={offerEnd}
+                  onChange={(e) => setOfferEnd(e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+            </div>
+          )}
+          <p className="text-xs text-neutral-500">
+            Sin fechas, la oferta queda activa hasta que borres el precio en oferta.
+          </p>
+        </fieldset>
+      )}
 
       <div className="flex justify-end gap-2 pt-2">
         <button type="button" onClick={onCancel} disabled={pending} className={secondaryButton}>

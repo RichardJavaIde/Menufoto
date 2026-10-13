@@ -40,11 +40,13 @@ export function DishesManager({
   categories,
   tags,
   currencySymbol,
+  canManageTv,
 }: {
   dishes: DishRow[];
   categories: CategoryOption[];
   tags: TagOption[];
   currencySymbol: string;
+  canManageTv: boolean;
 }) {
   const [modal, setModal] = useState<ModalState>(null);
   const [filterCategory, setFilterCategory] = useState("all");
@@ -203,6 +205,17 @@ export function DishesManager({
                               </span>
                             )}
                           </div>
+                           {d.popular && (
+                              <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-800">
+                                Popular
+                              </span>
+                            )}
+                            {d.offerPriceCents !== null && (
+                              <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
+                                Oferta {formatPrice(d.offerPriceCents, currencySymbol)}
+                                {d.offerEnd ? ` · hasta ${d.offerEnd}` : ""}
+                              </span>
+                            )}
                           {d.description && (
                             <p className="mt-0.5 truncate text-sm text-neutral-500">
                               {d.description}
@@ -309,9 +322,11 @@ export function DishesManager({
             categories={categories}
             tags={tags}
             currencySymbol={currencySymbol}
+            canManageTv={canManageTv}
             defaultCategoryId={defaultCategoryId}
             onDone={close}
             onCancel={close}
+            
           />
         </Modal>
       )}
@@ -321,6 +336,7 @@ export function DishesManager({
           <DishForm
             dish={modal.dish}
             categories={categories}
+            canManageTv={canManageTv}
             tags={tags}
             currencySymbol={currencySymbol}
             defaultCategoryId={modal.dish.categoryId}
