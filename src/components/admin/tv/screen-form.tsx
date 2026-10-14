@@ -9,21 +9,9 @@ import { inputClass, primaryButton, secondaryButton } from "@/components/ui/styl
 import type { ScreenRow } from "./types";
 
 const PRESETS = [
-  {
-    value: "PROMO",
-    label: "Promociones",
-    hint: "Ofertas y platos populares.",
-  },
-  {
-    value: "MENU",
-    label: "Menú",
-    hint: "Una diapositiva por cada categoría activa.",
-  },
-  {
-    value: "EMPTY",
-    label: "Vacía",
-    hint: "Sin diapositivas; las agregas tú después.",
-  },
+  { value: "PROMO", label: "Promociones", hint: "Ofertas y platos populares." },
+  { value: "MENU", label: "Menú", hint: "Una diapositiva por cada categoría activa." },
+  { value: "EMPTY", label: "Vacía", hint: "Sin diapositivas; las agregas tú después." },
 ] as const;
 
 type Preset = (typeof PRESETS)[number]["value"];
@@ -38,6 +26,7 @@ export function ScreenForm({
   onCancel: () => void;
 }) {
   const [name, setName] = useState(screen?.name ?? "");
+  const [link, setLink] = useState(screen?.link ?? "");
   const [preset, setPreset] = useState<Preset>("PROMO");
   const [pending, startTransition] = useTransition();
 
@@ -45,8 +34,8 @@ export function ScreenForm({
     e.preventDefault();
     startTransition(async () => {
       const result = screen
-        ? await updateScreenAction({ id: screen.id, name })
-        : await createScreenAction({ name, preset });
+        ? await updateScreenAction({ id: screen.id, name, link })
+        : await createScreenAction({ name, link, preset });
       if (notify(result)) onDone();
     });
   }
@@ -66,6 +55,30 @@ export function ScreenForm({
           placeholder="Ej: Pantalla 1 · Promociones"
           className={inputClass}
         />
+      </div>
+
+      <div>
+        <label htmlFor="s-link" className="block text-sm font-medium">
+          Enlace
+          {!screen && <span className="font-normal text-neutral-500"> (opcional)</span>}
+        </label>
+        <div className="mt-1 flex items-center">
+          <span className="rounded-l-md border border-r-0 border-neutral-300 bg-neutral-50 px-3 py-2 text-sm text-neutral-500">
+            /tv/
+          </span>
+          <input
+            id="s-link"
+            value={link}
+            onChange={(e) => setLink(e.target.value)}
+            required={Boolean(screen)}
+            maxLength={40}
+            placeholder={screen ? "1" : "Automático: 1, 2, 3…"}
+            className="w-full rounded-r-md border border-neutral-300 bg-white px-3 py-2 text-sm outline-none focus:border-neutral-900"
+          />
+        </div>
+        <p className="mt-1 text-xs text-neutral-500">
+          Solo letras, números y guiones. Si lo cambias, hay que escribir el enlace nuevo en la TV.
+        </p>
       </div>
 
       {!screen && (

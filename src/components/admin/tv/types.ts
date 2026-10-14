@@ -2,7 +2,8 @@
 export type ScreenRow = {
   id: string;
   name: string;
-  url: string; // enlace completo /tv/<token>
+  link: string; // parte final de la dirección: /tv/<link>
+  url: string; // dirección completa
   active: boolean;
   slideCount: number;
   lastSeen: string | null; // ya formateado en la zona del restaurante

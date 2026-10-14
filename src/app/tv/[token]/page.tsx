@@ -1,7 +1,7 @@
 //src/app/tv/[token]/page.tsx
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getTvData } from "@/lib/tv-data";
+import { getTvData, tvEtag, tvPayload } from "@/lib/tv-data";
 import { resolveTheme } from "@/themes/resolve";
 import { fontVariableClasses } from "@/themes/fonts";
 import { MenuTheme } from "@/components/menu/menu-theme";
@@ -20,8 +20,10 @@ export default async function TvPage({ params }: { params: Promise<{ token: stri
   if (!data) notFound();
 
   if (data.status === "inactive") {
+    // Se vuelve a intentar sola cada minuto
     return (
       <main className="fixed inset-0 flex items-center justify-center bg-black text-white">
+        <meta httpEquiv="refresh" content="60" />
         <p className="text-3xl">Pantalla desactivada</p>
       </main>
     );
@@ -34,14 +36,10 @@ export default async function TvPage({ params }: { params: Promise<{ token: stri
     <div className={fontClasses}>
       <MenuTheme resolved={resolved} className="fixed inset-0 cursor-none overflow-hidden">
         <TvPlayer
-          restaurantName={data.restaurantName}
-          logoKey={data.logoKey}
-          currencySymbol={data.currencySymbol}
-          timezone={data.timezone}
+          token={token}
+          initial={tvPayload(data)}
+          etag={tvEtag(data)}
           serverNowMs={data.serverNowMs}
-          slides={data.slides}
-          dishes={data.dishes}
-          categories={data.categories}
         />
       </MenuTheme>
     </div>

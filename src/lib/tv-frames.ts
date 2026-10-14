@@ -140,3 +140,16 @@ export function buildFrames(
 
   return frames;
 }
+
+// Lo que el servidor entrega al reproductor (y que se compara por ETag)
+export type TvPayload = {
+  bootId: string;
+  appearanceKey: string;
+  restaurantName: string;
+  logoKey: string | null;
+  currencySymbol: string;
+  timezone: string;
+  slides: TvSlideConfig[];
+  dishes: TvDish[];
+  categories: TvCategory[];
+};

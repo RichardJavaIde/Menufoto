@@ -31,6 +31,7 @@ export default async function TvPage() {
       screens={screens.map((s) => ({
         id: s.id,
         name: s.name,
+        link: s.token,
         url: `${base}/tv/${s.token}`,
         active: s.active,
         slideCount: s._count.slides,

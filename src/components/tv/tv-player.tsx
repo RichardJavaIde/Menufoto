@@ -7,35 +7,95 @@ import { mediaUrl } from "@/lib/media";
 import { formatPrice } from "@/lib/format";
 import {
   buildFrames,
-  type TvCategory,
-  type TvDish,
   type TvFrame,
   type TvFrameDish,
-  type TvSlideConfig,
+  type TvPayload,
 } from "@/lib/tv-frames";
 
 const W = 1920;
 const H = 1080;
+const MIN_REFRESH_MS = 30_000;
+const FETCH_TIMEOUT_MS = 8_000;
 
 type Props = {
-  restaurantName: string;
-  logoKey: string | null;
-  currencySymbol: string;
-  timezone: string;
+  token: string;
+  initial: TvPayload;
+  etag: string;
   serverNowMs: number;
-  slides: TvSlideConfig[];
-  dishes: TvDish[];
-  categories: TvCategory[];
 };
 
-export function TvPlayer(props: Props) {
-  const { slides, dishes, categories, timezone, serverNowMs } = props;
+type RefreshResult = { data: TvPayload; notice: string | null };
 
+export function TvPlayer({ token, initial, etag, serverNowMs }: Props) {
+  const [data, setData] = useState<TvPayload>(initial);
+  const [notice, setNotice] = useState<string | null>(null);
   const [scale, setScale] = useState<number | null>(null);
   const [frames, setFrames] = useState<TvFrame[] | null>(null);
   const [index, setIndex] = useState(0);
+
   // Diferencia entre el reloj del servidor y el de la TV (muchas TV tienen la hora mal)
-  const offset = useRef(0);
+  const offset = useRef(serverNowMs - Date.now());
+  const etagRef = useRef(etag);
+  const lastFetch = useRef(0);
+
+  const now = () => Date.now() + offset.current;
+
+  function build(d: TvPayload) {
+    return buildFrames(d.slides, d.dishes, d.categories, d.timezone, now());
+  }
+
+  // Pide datos nuevos al servidor. Si algo falla, se sigue con lo que ya hay.
+  async function refresh(current: TvPayload, currentNotice: string | null): Promise<RefreshResult> {
+    const keep = { data: current, notice: currentNotice };
+    if (Date.now() - lastFetch.current < MIN_REFRESH_MS) return keep;
+    lastFetch.current = Date.now();
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+    try {
+      const res = await fetch(`/api/tv/${encodeURIComponent(token)}`, {
+        cache: "no-store",
+        signal: controller.signal,
+        headers: { "If-None-Match": etagRef.current },
+      });
+
+      const serverDate = Date.parse(res.headers.get("date") ?? "");
+      if (!Number.isNaN(serverDate)) offset.current = serverDate - Date.now();
+
+      if (res.status === 304) return { data: current, notice: null };
+       if (res.status === 404) {
+        // Solo es "enlace no válido" si lo dice nuestro API; un 404 de otro tipo se ignora
+        const missing = await res.json().catch(() => null);
+        return missing?.status === "missing"
+          ? { data: current, notice: "Enlace no válido" }
+          : keep;
+      }
+      if (!res.ok) return keep;
+
+      const body = await res.json();
+
+      // Servidor reiniciado (actualización): se recarga la página completa
+      if (body.bootId !== initial.bootId) {
+        window.location.reload();
+        return keep;
+      }
+      if (body.status === "inactive") return { data: current, notice: "Pantalla desactivada" };
+
+      const payload = body as TvPayload;
+      // Cambió el tema (colores o tipografías): también se recarga
+      if (payload.appearanceKey !== initial.appearanceKey) {
+        window.location.reload();
+        return keep;
+      }
+
+      etagRef.current = res.headers.get("etag") ?? etagRef.current;
+      return { data: payload, notice: null };
+    } catch {
+      return keep;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
 
   // Escala el lienzo 1920×1080 a la pantalla
   useEffect(() => {
@@ -45,31 +105,41 @@ export function TvPlayer(props: Props) {
     return () => window.removeEventListener("resize", fit);
   }, []);
 
-  // Primera construcción de la lista de diapositivas
+  // Primera construcción de la lista
   useEffect(() => {
-    offset.current = serverNowMs - Date.now();
-    setFrames(buildFrames(slides, dishes, categories, timezone, Date.now() + offset.current));
+    lastFetch.current = Date.now();
+    setFrames(build(initial));
     setIndex(0);
-  }, [slides, dishes, categories, timezone, serverNowMs]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // Avanza a la siguiente; al terminar la vuelta recalcula todo con la hora actual
+  // Avanza a la siguiente; al terminar la vuelta pide datos nuevos y recalcula
   useEffect(() => {
     if (!frames) return;
     const current = frames[index];
-    const ms = (current ? current.seconds : 10) * 1000;
-    const timer = setTimeout(() => {
+    const seconds = notice || !current ? 10 : current.seconds;
+    let cancelled = false;
+
+    const timer = setTimeout(async () => {
       const next = index + 1;
-      if (next >= frames.length) {
-        setFrames(
-          buildFrames(slides, dishes, categories, timezone, Date.now() + offset.current)
-        );
-        setIndex(0);
-      } else {
+      if (!notice && next < frames.length) {
         setIndex(next);
+        return;
       }
-    }, ms);
-    return () => clearTimeout(timer);
-  }, [frames, index, slides, dishes, categories, timezone]);
+      const fresh = await refresh(data, notice);
+      if (cancelled) return;
+      setData(fresh.data);
+      setNotice(fresh.notice);
+      setFrames(fresh.notice ? [] : build(fresh.data));
+      setIndex(0);
+    }, seconds * 1000);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [frames, index, data, notice]);
 
   // Precarga las fotos de la siguiente diapositiva
   useEffect(() => {
@@ -99,18 +169,30 @@ export function TvPlayer(props: Props) {
           visibility: scale === null || frames === null ? "hidden" : "visible",
         }}
       >
-        {frame ? (
+        {notice ? (
+          <NoticeView text={notice} />
+        ) : frame ? (
           <FrameView
             key={frame.key}
             frame={frame}
-            restaurantName={props.restaurantName}
-            logoKey={props.logoKey}
-            symbol={props.currencySymbol}
+            restaurantName={data.restaurantName}
+            logoKey={data.logoKey}
+            symbol={data.currencySymbol}
           />
         ) : frames ? (
-          <IdleView restaurantName={props.restaurantName} logoKey={props.logoKey} />
+          <IdleView restaurantName={data.restaurantName} logoKey={data.logoKey} />
         ) : null}
       </div>
+    </div>
+  );
+}
+
+function NoticeView({ text }: { text: string }) {
+  return (
+    <div className="tv-frame tv-fx-fade flex items-center justify-center">
+      <p className="text-[64px]" style={{ color: "var(--m-muted)" }}>
+        {text}
+      </p>
     </div>
   );
 }

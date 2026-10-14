@@ -3,32 +3,18 @@
 
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import {
-  Plus,
-  Pencil,
-  Trash2,
-  Copy,
-  ExternalLink,
-  Power,
-  PowerOff,
-  RefreshCw,
-} from "lucide-react";
+import { Plus, Pencil, Trash2, Copy, ExternalLink, Power, PowerOff } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { primaryButton } from "@/components/ui/styles";
 import { notify } from "@/lib/notify";
-import {
-  toggleScreenActiveAction,
-  regenerateScreenTokenAction,
-  deleteScreenAction,
-} from "@/actions/tv";
+import { toggleScreenActiveAction, deleteScreenAction } from "@/actions/tv";
 import { ScreenForm } from "./screen-form";
 import type { ScreenRow } from "./types";
 
 type ModalState =
   | { type: "create" }
   | { type: "edit"; screen: ScreenRow }
-  | { type: "regenerate"; screen: ScreenRow }
   | { type: "delete"; screen: ScreenRow }
   | null;
 
@@ -56,12 +42,6 @@ export function TvManager({ screens }: { screens: ScreenRow[] }) {
     });
   }
 
-  function confirmRegenerate(screen: ScreenRow) {
-    startTransition(async () => {
-      if (notify(await regenerateScreenTokenAction({ id: screen.id }))) close();
-    });
-  }
-
   function confirmDelete(screen: ScreenRow) {
     startTransition(async () => {
       if (notify(await deleteScreenAction({ id: screen.id }))) close();
@@ -74,7 +54,8 @@ export function TvManager({ screens }: { screens: ScreenRow[] }) {
         <div>
           <h1 className="text-2xl font-semibold">Pantalla TV</h1>
           <p className="mt-1 text-sm text-neutral-500">
-            Cada pantalla tiene su propio enlace. Ábrelo en el navegador del televisor.
+            Cada pantalla tiene su propio enlace. Escríbelo una sola vez en el navegador del
+            televisor y déjalo fijo.
           </p>
         </div>
         <button onClick={() => setModal({ type: "create" })} className={primaryButton}>
@@ -135,8 +116,8 @@ export function TvManager({ screens }: { screens: ScreenRow[] }) {
                   <button
                     onClick={() => setModal({ type: "edit", screen: s })}
                     className={iconButton}
-                    title="Renombrar"
-                    aria-label="Renombrar"
+                    title="Editar nombre y enlace"
+                    aria-label="Editar nombre y enlace"
                   >
                     <Pencil className="h-4 w-4" />
                   </button>
@@ -147,15 +128,11 @@ export function TvManager({ screens }: { screens: ScreenRow[] }) {
                     title={s.active ? "Desactivar" : "Activar"}
                     aria-label={s.active ? "Desactivar" : "Activar"}
                   >
-                    {s.active ? <Power className="h-4 w-4" /> : <PowerOff className="h-4 w-4 text-amber-600" />}
-                  </button>
-                  <button
-                    onClick={() => setModal({ type: "regenerate", screen: s })}
-                    className={iconButton}
-                    title="Generar enlace nuevo"
-                    aria-label="Generar enlace nuevo"
-                  >
-                    <RefreshCw className="h-4 w-4" />
+                    {s.active ? (
+                      <Power className="h-4 w-4" />
+                    ) : (
+                      <PowerOff className="h-4 w-4 text-amber-600" />
+                    )}
                   </button>
                   <button
                     onClick={() => setModal({ type: "delete", screen: s })}
@@ -187,20 +164,9 @@ export function TvManager({ screens }: { screens: ScreenRow[] }) {
       )}
 
       {modal?.type === "edit" && (
-        <Modal title="Renombrar pantalla" onClose={close}>
+        <Modal title="Editar pantalla" onClose={close}>
           <ScreenForm screen={modal.screen} onDone={close} onCancel={close} />
         </Modal>
-      )}
-
-      {modal?.type === "regenerate" && (
-        <ConfirmDialog
-          title="Generar enlace nuevo"
-          message={`El enlace actual de "${modal.screen.name}" dejará de funcionar y tendrás que abrir el nuevo en el televisor. ¿Continuar?`}
-          confirmLabel="Generar enlace"
-          pending={isPending}
-          onConfirm={() => confirmRegenerate(modal.screen)}
-          onCancel={close}
-        />
       )}
 
       {modal?.type === "delete" && (

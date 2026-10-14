@@ -1,17 +1,33 @@
 //src/lib/tv-data.ts
+import { createHash } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import type { Appearance } from "@/themes/resolve";
-import type { TvCategory, TvDish, TvSlideConfig } from "@/lib/tv-frames";
+import type { TvCategory, TvDish, TvPayload, TvSlideConfig } from "@/lib/tv-frames";
+
+// Cambia cada vez que el servidor se reinicia (por ejemplo, al actualizar la imagen Docker).
+// Las pantallas lo comparan y se recargan solas cuando cambia.
+const g = globalThis as unknown as { __tvBootId?: string };
+g.__tvBootId ??= Date.now().toString(36);
+export const BOOT_ID: string = g.__tvBootId;
+
+const SEEN_EVERY_MS = 60_000;
 
 export async function getTvData(token: string) {
-  // Los tokens generados tienen 32 caracteres; esto evita consultas con basura
-  if (!/^[A-Za-z0-9_-]{16,64}$/.test(token)) return null;
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(token)) return null;
 
   const screen = await prisma.tvScreen.findUnique({
     where: { token },
     include: { slides: { where: { active: true }, orderBy: { position: "asc" } } },
   });
   if (!screen) return null;
+
+  // Última conexión: se guarda como máximo una vez por minuto
+  if (!screen.lastSeenAt || Date.now() - screen.lastSeenAt.getTime() > SEEN_EVERY_MS) {
+    prisma.tvScreen
+      .update({ where: { id: screen.id }, data: { lastSeenAt: new Date() } })
+      .catch((e) => console.error(e));
+  }
+
   if (!screen.active) return { status: "inactive" as const, name: screen.name };
 
   const [settings, categories, dishes] = await Promise.all([
@@ -32,11 +48,6 @@ export async function getTvData(token: string) {
     }),
   ]);
 
-  // Última conexión (el "latido" completo llega en la Fase 3)
-  prisma.tvScreen
-    .update({ where: { id: screen.id }, data: { lastSeenAt: new Date() } })
-    .catch((e) => console.error(e));
-
   const appearance: Appearance = {
     themeId: settings?.themeId ?? "elegante",
     colorPrimary: settings?.colorPrimary ?? null,
@@ -47,7 +58,7 @@ export async function getTvData(token: string) {
     fontBody: settings?.fontBody ?? null,
   };
 
-  const tvSlides: TvSlideConfig[] = screen.slides.map((s) => ({
+  const slides: TvSlideConfig[] = screen.slides.map((s) => ({
     id: s.id,
     type: s.type,
     seconds: s.seconds,
@@ -82,8 +93,30 @@ export async function getTvData(token: string) {
     currencySymbol: settings?.currencySymbol ?? "RD$",
     timezone: settings?.timezone ?? "America/Santo_Domingo",
     serverNowMs: Date.now(),
-    slides: tvSlides,
+    slides,
     dishes: tvDishes,
     categories: tvCategories,
   };
+}
+
+type TvOk = Extract<NonNullable<Awaited<ReturnType<typeof getTvData>>>, { status: "ok" }>;
+
+export function tvPayload(d: TvOk): TvPayload {
+  return {
+    bootId: BOOT_ID,
+    appearanceKey: JSON.stringify(d.appearance),
+    restaurantName: d.restaurantName,
+    logoKey: d.logoKey,
+    currencySymbol: d.currencySymbol,
+    timezone: d.timezone,
+    slides: d.slides,
+    dishes: d.dishes,
+    categories: d.categories,
+  };
+}
+
+// Huella del contenido: si no cambió nada, el servidor responde 304 sin enviar datos
+export function tvEtag(d: TvOk) {
+  const hash = createHash("sha1").update(JSON.stringify(tvPayload(d))).digest("hex");
+  return `"${hash}"`;
 }

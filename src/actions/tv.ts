@@ -1,7 +1,6 @@
 //src/actions/tv.ts
 "use server";
 
-import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -13,14 +12,12 @@ import {
   screenIdSchema,
 } from "@/lib/schemas/tv";
 
-// Enlace secreto de la pantalla: 192 bits aleatorios
-function newToken() {
-  return randomBytes(24).toString("base64url");
-}
-
 function dbError(e: unknown): ActionResult {
-  if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2025") {
-    return { ok: false, error: "La pantalla ya no existe" };
+  if (e instanceof Prisma.PrismaClientKnownRequestError) {
+    if (e.code === "P2002") {
+      return { ok: false, error: "Ya existe una pantalla con ese enlace. Elige otro." };
+    }
+    if (e.code === "P2025") return { ok: false, error: "La pantalla ya no existe" };
   }
   console.error(e);
   return { ok: false, error: "Ocurrió un error inesperado. Intenta de nuevo." };
@@ -30,12 +27,22 @@ function refresh() {
   revalidatePath("/admin", "layout");
 }
 
+// Primer número libre: "1", "2", "3"…
+async function nextFreeLink() {
+  const used = new Set(
+    (await prisma.tvScreen.findMany({ select: { token: true } })).map((s) => s.token)
+  );
+  let n = 1;
+  while (used.has(String(n))) n++;
+  return String(n);
+}
+
 export async function createScreenAction(input: unknown): Promise<ActionResult> {
   await requireSection("tv");
 
   const parsed = createScreenSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
-  const { name, preset } = parsed.data;
+  const { name, link, preset } = parsed.data;
 
   try {
     let slides: Prisma.TvSlideCreateWithoutScreenInput[] = [];
@@ -60,7 +67,11 @@ export async function createScreenAction(input: unknown): Promise<ActionResult> 
     }
 
     await prisma.tvScreen.create({
-      data: { name, token: newToken(), slides: { create: slides } },
+      data: {
+        name,
+        token: link || (await nextFreeLink()),
+        slides: { create: slides },
+      },
     });
   } catch (e) {
     return dbError(e);
@@ -75,10 +86,10 @@ export async function updateScreenAction(input: unknown): Promise<ActionResult> 
 
   const parsed = updateScreenSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
-  const { id, name } = parsed.data;
+  const { id, name, link } = parsed.data;
 
   try {
-    await prisma.tvScreen.update({ where: { id }, data: { name } });
+    await prisma.tvScreen.update({ where: { id }, data: { name, token: link } });
   } catch (e) {
     return dbError(e);
   }
@@ -111,24 +122,6 @@ export async function toggleScreenActiveAction(input: unknown): Promise<ActionRe
   } catch (e) {
     return dbError(e);
   }
-}
-
-// El enlace anterior deja de funcionar de inmediato
-export async function regenerateScreenTokenAction(input: unknown): Promise<ActionResult> {
-  await requireSection("tv");
-
-  const parsed = screenIdSchema.safeParse(input);
-  if (!parsed.success) return { ok: false, error: "Solicitud inválida" };
-  const { id } = parsed.data;
-
-  try {
-    await prisma.tvScreen.update({ where: { id }, data: { token: newToken() } });
-  } catch (e) {
-    return dbError(e);
-  }
-
-  refresh();
-  return { ok: true, message: "Enlace nuevo generado. El anterior ya no funciona." };
 }
 
 export async function deleteScreenAction(input: unknown): Promise<ActionResult> {
