@@ -32,6 +32,11 @@ enum TvEffect {
   ZOOM
   KENBURNS
 }
+enum TvGalleryMode {
+  SINGLE
+  SPLIT
+  SEQUENCE
+}
 
 model User {
   id           String   @id @default(cuid())
@@ -205,6 +210,8 @@ model TvSlide {
   title  String?
   text   String?
   images TvSlideImage[]
+    // Cómo se muestran las imágenes: SINGLE (una), SPLIT (dos a la vez), SEQUENCE (una tras otra)
+  galleryMode TvGalleryMode @default(SEQUENCE)
 
   @@index([screenId, position])
 }

@@ -3,14 +3,15 @@
 
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Copy, ExternalLink, Power, PowerOff } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { primaryButton } from "@/components/ui/styles";
 import { notify } from "@/lib/notify";
 import { toggleScreenActiveAction, deleteScreenAction } from "@/actions/tv";
 import { ScreenForm } from "./screen-form";
 import type { ScreenRow } from "./types";
+import Link from "next/link";
+import { Plus, Pencil, Trash2, Copy, ExternalLink, Power, PowerOff, ListOrdered } from "lucide-react";
+import { primaryButton, secondaryButton } from "@/components/ui/styles";
 
 type ModalState =
   | { type: "create" }
@@ -95,6 +96,13 @@ export function TvManager({ screens }: { screens: ScreenRow[] }) {
                 </div>
 
                 <div className="flex shrink-0 items-center gap-1">
+                                    <Link
+                    href={`/admin/tv/${s.id}`}
+                    className={`${secondaryButton} mr-1 px-3 py-1.5`}
+                  >
+                    <ListOrdered className="h-4 w-4" />
+                    Diapositivas
+                  </Link>
                   <button
                     onClick={() => copy(s.url)}
                     className={iconButton}
