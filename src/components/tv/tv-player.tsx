@@ -145,11 +145,13 @@ export function TvPlayer({ token, initial, etag, serverNowMs }: Props) {
   useEffect(() => {
     if (!frames || frames.length < 2) return;
     const next = frames[(index + 1) % frames.length];
-    next.dishes.forEach((d) => {
-      if (d.imageKey) {
-        const img = new window.Image();
-        img.src = mediaUrl(d.imageKey, 960);
-      }
+        const urls = [
+      ...next.dishes.flatMap((d) => (d.imageKey ? [mediaUrl(d.imageKey, 960)] : [])),
+      ...next.images.map((key) => mediaUrl(key, "src")),
+    ];
+    urls.forEach((url) => {
+      const img = new window.Image();
+      img.src = url;
     });
   }, [frames, index]);
 
@@ -228,6 +230,7 @@ function FrameView({
   logoKey: string | null;
   symbol: string;
 }) {
+    if (frame.kind === "GALLERY") return <GalleryView frame={frame} />;
   const style = { "--tv-seconds": `${frame.seconds}s` } as CSSProperties;
 
   return (
@@ -378,6 +381,42 @@ function CategoryList({ dishes, symbol }: { dishes: TvFrameDish[]; symbol: strin
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+function GalleryView({ frame }: { frame: TvFrame }) {
+  const style = { "--tv-seconds": `${frame.seconds}s` } as CSSProperties;
+  const [first] = frame.images;
+  const multiple = frame.images.length > 1;
+
+  return (
+    <div className={`tv-frame tv-fx-${frame.effect.toLowerCase()}`} style={style}>
+      {/* Fondo: la misma imagen en miniatura, estirada y oscurecida (barato para TV viejas) */}
+      <div
+        className="absolute inset-0"
+        style={{
+          backgroundImage: `url(${mediaUrl(first, 480)})`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+        }}
+      />
+      <div className="absolute inset-0" style={{ background: "rgba(0,0,0,0.55)" }} />
+
+      <div
+        className="absolute inset-0 flex items-center justify-center"
+        style={{ gap: multiple ? 32 : 0, padding: multiple ? "0 32px" : 0 }}
+      >
+        {frame.images.map((key) => (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            key={key}
+            src={mediaUrl(key, "src")}
+            alt=""
+            className="min-w-0 flex-1"
+            style={{ height: "100%", objectFit: "contain" }}
+          />
+        ))}
+      </div>
     </div>
   );
 }

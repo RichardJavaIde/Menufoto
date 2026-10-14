@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireSection } from "@/lib/auth";
+import { deleteImageById, isImageFree } from "@/lib/images";
+import { GALLERY_LIMITS } from "@/lib/tv-frames";
 import type { ActionResult } from "@/lib/action-result";
 import {
   createSlideSchema,
@@ -12,6 +14,8 @@ import {
   slideIdSchema,
   moveSlideSchema,
 } from "@/lib/schemas/tv-slide";
+
+const IMAGE_UNAVAILABLE = "Una imagen ya no está disponible. Súbela de nuevo.";
 
 function dbError(e: unknown): ActionResult {
   if (
@@ -66,7 +70,7 @@ export async function createSlideAction(input: unknown): Promise<ActionResult> {
         screenId,
         type,
         position: (last._max.position ?? -1) + 1,
-        seconds: type === "CATEGORY" ? 15 : 12,
+        seconds: type === "CATEGORY" ? 15 : type === "GALLERY" ? 8 : 12,
         categoryId: type === "CATEGORY" ? categoryId : null,
       },
     });
@@ -75,7 +79,13 @@ export async function createSlideAction(input: unknown): Promise<ActionResult> {
   }
 
   refresh();
-  return { ok: true, message: "Diapositiva agregada" };
+  return {
+    ok: true,
+    message:
+      type === "GALLERY"
+        ? "Galería creada. Edítala para subir las imágenes."
+        : "Diapositiva agregada",
+  };
 }
 
 export async function updateSlideAction(input: unknown): Promise<ActionResult> {
@@ -83,26 +93,71 @@ export async function updateSlideAction(input: unknown): Promise<ActionResult> {
 
   const parsed = updateSlideSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
-  const { id, seconds, effect, active, days, start, end, categoryId } = parsed.data;
+  const { id, seconds, effect, active, days, start, end, categoryId, galleryMode, imageIds } =
+    parsed.data;
+
+  // Imágenes que dejan de usarse: se borran del disco después de guardar
+  let removedImageIds: string[] = [];
 
   try {
-    const slide = await prisma.tvSlide.findUnique({ where: { id }, select: { type: true } });
+    const slide = await prisma.tvSlide.findUnique({
+      where: { id },
+      select: { type: true, images: { select: { imageId: true } } },
+    });
     if (!slide) return { ok: false, error: "La diapositiva ya no existe" };
 
-    await prisma.tvSlide.update({
-      where: { id },
-      data: {
-        seconds,
-        effect,
-        active,
-        days: daysToMask(days),
-        startMinute: start ? timeToMinutes(start) : null,
-        endMinute: end ? timeToMinutes(end) : null,
-        ...(slide.type === "CATEGORY" && categoryId ? { categoryId } : {}),
-      },
-    });
+    const base = {
+      seconds,
+      effect,
+      active,
+      days: daysToMask(days),
+      startMinute: start ? timeToMinutes(start) : null,
+      endMinute: end ? timeToMinutes(end) : null,
+      ...(slide.type === "CATEGORY" && categoryId ? { categoryId } : {}),
+    };
+
+    if (slide.type !== "GALLERY") {
+      await prisma.tvSlide.update({ where: { id }, data: base });
+    } else {
+      const mode = galleryMode ?? "SEQUENCE";
+      const ids = imageIds ?? [];
+      const limit = GALLERY_LIMITS[mode];
+
+      if (ids.length > limit) {
+        return {
+          ok: false,
+          error: `Este modo admite como máximo ${limit} ${
+            limit === 1 ? "imagen" : "imágenes"
+          }. Quita algunas.`,
+        };
+      }
+      if (new Set(ids).size !== ids.length) {
+        return { ok: false, error: "Hay una imagen repetida" };
+      }
+
+      const currentIds = slide.images.map((i) => i.imageId);
+      for (const imageId of ids) {
+        if (!currentIds.includes(imageId) && !(await isImageFree(imageId))) {
+          return { ok: false, error: IMAGE_UNAVAILABLE };
+        }
+      }
+
+      await prisma.$transaction([
+        prisma.tvSlide.update({ where: { id }, data: { ...base, galleryMode: mode } }),
+        prisma.tvSlideImage.deleteMany({ where: { slideId: id } }),
+        prisma.tvSlideImage.createMany({
+          data: ids.map((imageId, position) => ({ slideId: id, imageId, position })),
+        }),
+      ]);
+
+      removedImageIds = currentIds.filter((x) => !ids.includes(x));
+    }
   } catch (e) {
     return dbError(e);
+  }
+
+  for (const imageId of removedImageIds) {
+    await deleteImageById(imageId).catch((e) => console.error(e));
   }
 
   refresh();
@@ -177,7 +232,16 @@ export async function deleteSlideAction(input: unknown): Promise<ActionResult> {
   const { id } = parsed.data;
 
   try {
+    const slide = await prisma.tvSlide.findUnique({
+      where: { id },
+      select: { images: { select: { imageId: true } } },
+    });
     await prisma.tvSlide.delete({ where: { id } });
+
+    // Las imágenes de una galería eliminada se borran de la base y del disco
+    for (const { imageId } of slide?.images ?? []) {
+      await deleteImageById(imageId).catch((e) => console.error(e));
+    }
   } catch (e) {
     return dbError(e);
   }

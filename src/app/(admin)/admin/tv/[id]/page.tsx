@@ -14,7 +14,13 @@ export default async function TvSlidesPage({ params }: { params: Promise<{ id: s
       include: {
         slides: {
           orderBy: [{ position: "asc" }, { id: "asc" }],
-          include: { category: { select: { name: true } } },
+          include: {
+            category: { select: { name: true } },
+            images: {
+              orderBy: { position: "asc" },
+              include: { image: { select: { id: true, fileKey: true } } },
+            },
+          },
         },
       },
     }),
@@ -42,6 +48,8 @@ export default async function TvSlidesPage({ params }: { params: Promise<{ id: s
         endMinute: s.endMinute,
         categoryId: s.categoryId,
         categoryName: s.category?.name ?? null,
+        galleryMode: s.galleryMode,
+        images: s.images.map((i) => ({ id: i.image.id, key: i.image.fileKey })),
       }))}
     />
   );

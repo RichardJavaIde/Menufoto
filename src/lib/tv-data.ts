@@ -17,7 +17,18 @@ export async function getTvData(token: string) {
 
   const screen = await prisma.tvScreen.findUnique({
     where: { token },
-    include: { slides: { where: { active: true }, orderBy: { position: "asc" } } },
+    include: {
+      slides: {
+        where: { active: true },
+        orderBy: { position: "asc" },
+        include: {
+          images: {
+            orderBy: { position: "asc" },
+            include: { image: { select: { fileKey: true } } },
+          },
+        },
+      },
+    },
   });
   if (!screen) return null;
 
@@ -67,6 +78,8 @@ export async function getTvData(token: string) {
     startMinute: s.startMinute,
     endMinute: s.endMinute,
     categoryId: s.categoryId,
+    galleryMode: s.galleryMode,
+    imageKeys: s.images.map((img) => img.image.fileKey),
   }));
 
   const tvDishes: TvDish[] = dishes.map((d) => ({

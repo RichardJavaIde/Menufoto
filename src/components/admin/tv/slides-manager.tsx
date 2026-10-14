@@ -32,11 +32,13 @@ import {
 import { AddSlideForm, SlideForm } from "./slide-form";
 import {
   EFFECT_LABEL,
+  MODE_LABEL,
   TYPE_INFO,
   scheduleSummary,
   type CategoryOption,
   type SlideRow,
   type SlideType,
+  
 } from "./slide-meta";
 
 type ModalState =
@@ -159,9 +161,21 @@ export function SlidesManager({
                           Sin categoría
                         </span>
                       )}
+                                            {s.type === "GALLERY" && s.images.length === 0 && (
+                        <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">
+                          Sin imágenes
+                        </span>
+                      )}
                     </div>
                     <p className="text-xs text-neutral-500">
-                      {s.seconds} s · {EFFECT_LABEL[s.effect]} ·{" "}
+                                            {s.type === "GALLERY"
+                        ? `${MODE_LABEL[s.galleryMode]} · ${s.images.length} ${
+                            s.images.length === 1 ? "imagen" : "imágenes"
+                          } · `
+                        : ""}
+                      {s.seconds} s
+                      {s.type === "GALLERY" && s.galleryMode === "SEQUENCE" ? " c/u" : ""} ·{" "}
+                      {EFFECT_LABEL[s.effect]} ·{" "}
                       {scheduleSummary(s.days, s.startMinute, s.endMinute)}
                     </p>
                   </div>

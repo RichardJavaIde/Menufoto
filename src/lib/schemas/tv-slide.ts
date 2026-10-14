@@ -8,7 +8,7 @@ const time = z.union([z.literal(""), z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$
 export const createSlideSchema = z
   .object({
     screenId: id,
-    type: z.enum(["OFFERS", "POPULAR", "CATEGORY"]),
+    type: z.enum(["OFFERS", "POPULAR", "CATEGORY", "GALLERY"]),
     categoryId: z.string().nullable(),
   })
   .superRefine((d, ctx) => {
@@ -31,6 +31,9 @@ export const updateSlideSchema = z
     start: time,
     end: time,
     categoryId: z.string().nullable(),
+    // Solo para galerías
+    galleryMode: z.enum(["SINGLE", "SPLIT", "SEQUENCE"]).optional(),
+    imageIds: z.array(z.string().min(1)).max(4).optional(),
   })
   .superRefine((d, ctx) => {
     if ((d.start === "") !== (d.end === "")) {

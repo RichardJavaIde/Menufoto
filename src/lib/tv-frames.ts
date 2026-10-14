@@ -3,6 +3,14 @@
 
 export type TvEffect = "FADE" | "SLIDE" | "ZOOM" | "KENBURNS";
 export type TvSlideType = "OFFERS" | "POPULAR" | "CATEGORY" | "GALLERY";
+export type TvGalleryMode = "SINGLE" | "SPLIT" | "SEQUENCE";
+
+// Máximo de imágenes por modo
+export const GALLERY_LIMITS: Record<TvGalleryMode, number> = {
+  SINGLE: 1,
+  SPLIT: 2,
+  SEQUENCE: 4,
+};
 
 export type TvDish = {
   id: string;
@@ -29,19 +37,22 @@ export type TvSlideConfig = {
   startMinute: number | null;
   endMinute: number | null;
   categoryId: string | null;
+  galleryMode: TvGalleryMode;
+  imageKeys: string[];
 };
 
 export type TvFrameDish = TvDish & { offer: number | null };
 
 export type TvFrame = {
   key: string;
-  kind: "OFFERS" | "POPULAR" | "CATEGORY";
+  kind: "OFFERS" | "POPULAR" | "CATEGORY" | "GALLERY";
   seconds: number;
   effect: TvEffect;
   title: string;
   page: number;
   pages: number;
   dishes: TvFrameDish[];
+  images: string[]; // claves de imagen (solo galerías)
 };
 
 const PER_PAGE = { OFFERS: 3, POPULAR: 3, CATEGORY: 10 } as const;
@@ -94,10 +105,31 @@ export function buildFrames(
   const frames: TvFrame[] = [];
 
   for (const slide of slides) {
-    const kind = slide.type;
-    if (kind === "GALLERY") continue; // llega en la Fase 2
     if (!inSchedule(slide, timeZone, nowMs)) continue;
+    const seconds = Math.max(3, slide.seconds);
 
+    // Galería: una imagen, dos a la vez, o una por vuelta (secuencia)
+    if (slide.type === "GALLERY") {
+      const keys = slide.imageKeys.slice(0, GALLERY_LIMITS[slide.galleryMode]);
+      if (keys.length === 0) continue;
+      const groups = slide.galleryMode === "SEQUENCE" ? keys.map((k) => [k]) : [keys];
+      groups.forEach((images, i) => {
+        frames.push({
+          key: `${slide.id}:${i}`,
+          kind: "GALLERY",
+          seconds,
+          effect: slide.effect,
+          title: "",
+          page: i + 1,
+          pages: groups.length,
+          dishes: [],
+          images,
+        });
+      });
+      continue;
+    }
+
+    const kind = slide.type;
     let title = "";
     let list: TvFrameDish[] = [];
 
@@ -128,12 +160,13 @@ export function buildFrames(
       frames.push({
         key: `${slide.id}:${i}`,
         kind,
-        seconds: Math.max(3, slide.seconds),
+        seconds,
         effect: slide.effect,
         title,
         page: i + 1,
         pages,
         dishes: list.slice(i * size, (i + 1) * size),
+        images: [],
       });
     }
   }

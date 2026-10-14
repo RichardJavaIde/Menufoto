@@ -1,6 +1,9 @@
 //src/components/admin/tv/slide-meta.ts
 export type SlideType = "OFFERS" | "POPULAR" | "CATEGORY" | "GALLERY";
 export type SlideEffect = "FADE" | "SLIDE" | "ZOOM" | "KENBURNS";
+export type GalleryMode = "SINGLE" | "SPLIT" | "SEQUENCE";
+
+export type GalleryImage = { id: string; key: string };
 
 export type SlideRow = {
   id: string;
@@ -13,6 +16,8 @@ export type SlideRow = {
   endMinute: number | null;
   categoryId: string | null;
   categoryName: string | null;
+  galleryMode: GalleryMode;
+  images: GalleryImage[];
 };
 
 export type CategoryOption = { id: string; name: string };
@@ -22,6 +27,18 @@ export const TYPE_INFO: Record<SlideType, { label: string; hint: string }> = {
   POPULAR: { label: "Los más pedidos", hint: "Platos marcados como populares." },
   CATEGORY: { label: "Categoría", hint: "Los platos de una categoría del menú." },
   GALLERY: { label: "Galería de imágenes", hint: "Flyers o fotos para eventos y promociones." },
+};
+
+export const GALLERY_MODES: { value: GalleryMode; label: string; hint: string }[] = [
+  { value: "SINGLE", label: "Una imagen", hint: "Ocupa toda la pantalla." },
+  { value: "SPLIT", label: "Dos lado a lado", hint: "Dos imágenes al mismo tiempo." },
+  { value: "SEQUENCE", label: "Secuencia", hint: "Hasta 4 imágenes, una tras otra." },
+];
+
+export const MODE_LABEL: Record<GalleryMode, string> = {
+  SINGLE: "Una imagen",
+  SPLIT: "Dos lado a lado",
+  SEQUENCE: "Secuencia",
 };
 
 export const EFFECTS: { value: SlideEffect; label: string }[] = [

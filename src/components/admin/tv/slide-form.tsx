@@ -2,25 +2,31 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { toast } from "sonner";
 import { createSlideAction, updateSlideAction } from "@/actions/tv-slides";
 import { notify } from "@/lib/notify";
+import { GALLERY_LIMITS } from "@/lib/tv-frames";
 import { Spinner } from "@/components/ui/spinner";
 import { inputClass, primaryButton, secondaryButton } from "@/components/ui/styles";
+import { GalleryImages } from "./gallery-images";
 import {
   DAY_ORDER,
   DAY_SHORT,
   EFFECTS,
+  GALLERY_MODES,
   TYPE_INFO,
   daysFromMask,
   minutesToTime,
   type CategoryOption,
+  type GalleryImage,
+  type GalleryMode,
   type SlideEffect,
   type SlideRow,
 } from "./slide-meta";
 
 // ---------- Agregar ----------
 
-const ADDABLE = ["OFFERS", "POPULAR", "CATEGORY"] as const;
+const ADDABLE = ["OFFERS", "POPULAR", "CATEGORY", "GALLERY"] as const;
 type Addable = (typeof ADDABLE)[number];
 
 export function AddSlideForm({
@@ -130,18 +136,27 @@ export function SlideForm({
   onDone: () => void;
   onCancel: () => void;
 }) {
+  const isGallery = slide.type === "GALLERY";
   const hasSchedule =
     slide.days !== null || slide.startMinute !== null || slide.endMinute !== null;
 
   const [seconds, setSeconds] = useState(String(slide.seconds));
-  const [effect, setEffect] = useState<SlideEffect>(slide.effect);
+  const [effect, setEffect] = useState<SlideEffect>(
+    isGallery && slide.effect === "KENBURNS" ? "FADE" : slide.effect
+  );
   const [active, setActive] = useState(slide.active);
   const [categoryId, setCategoryId] = useState(slide.categoryId ?? "");
+  const [mode, setMode] = useState<GalleryMode>(slide.galleryMode);
+  const [images, setImages] = useState<GalleryImage[]>(slide.images);
   const [custom, setCustom] = useState(hasSchedule);
   const [days, setDays] = useState<number[]>(daysFromMask(slide.days));
   const [start, setStart] = useState(minutesToTime(slide.startMinute));
   const [end, setEnd] = useState(minutesToTime(slide.endMinute));
   const [pending, startTransition] = useTransition();
+
+  const limit = GALLERY_LIMITS[mode];
+  // Los flyers no usan Ken Burns para no tapar el texto
+  const effects = isGallery ? EFFECTS.filter((e) => e.value !== "KENBURNS") : EFFECTS;
 
   function toggleDay(day: number) {
     setDays((current) =>
@@ -151,6 +166,16 @@ export function SlideForm({
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
+
+    if (isGallery && images.length > limit) {
+      toast.error(
+        `Este modo admite como máximo ${limit} ${limit === 1 ? "imagen" : "imágenes"}. Quita ${
+          images.length - limit
+        }.`
+      );
+      return;
+    }
+
     startTransition(async () => {
       const result = await updateSlideAction({
         id: slide.id,
@@ -161,6 +186,7 @@ export function SlideForm({
         start: custom ? start : "",
         end: custom ? end : "",
         categoryId: categoryId || null,
+        ...(isGallery ? { galleryMode: mode, imageIds: images.map((i) => i.id) } : {}),
       });
       if (notify(result)) onDone();
     });
@@ -168,9 +194,7 @@ export function SlideForm({
 
   return (
     <form onSubmit={submit} className="space-y-4">
-      <p className="text-sm text-neutral-500">
-        <span className="font-medium text-neutral-800">{TYPE_INFO[slide.type].label}</span>
-      </p>
+      <p className="text-sm font-medium text-neutral-800">{TYPE_INFO[slide.type].label}</p>
 
       {slide.type === "CATEGORY" && (
         <div>
@@ -193,10 +217,51 @@ export function SlideForm({
         </div>
       )}
 
+      {isGallery && (
+        <>
+          <fieldset>
+            <legend className="block text-sm font-medium">Cómo se muestran</legend>
+            <div className="mt-2 space-y-2">
+              {GALLERY_MODES.map((m) => (
+                <label
+                  key={m.value}
+                  className={`flex cursor-pointer items-start gap-3 rounded-lg p-3 ring-1 ${
+                    mode === m.value
+                      ? "bg-neutral-50 ring-neutral-900"
+                      : "ring-neutral-200 hover:bg-neutral-50"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="gallery-mode"
+                    checked={mode === m.value}
+                    onChange={() => setMode(m.value)}
+                    className="mt-1"
+                  />
+                  <span>
+                    <span className="block text-sm font-medium">{m.label}</span>
+                    <span className="block text-xs text-neutral-500">{m.hint}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+
+          <GalleryImages images={images} onChange={setImages} max={limit} />
+
+          {images.length > limit && (
+            <p className="text-sm text-red-600">
+              Tienes {images.length} imágenes y este modo admite {limit}. Quita{" "}
+              {images.length - limit} para poder guardar.
+            </p>
+          )}
+        </>
+      )}
+
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label htmlFor="e-seconds" className="block text-sm font-medium">
-            Segundos
+            {isGallery && mode === "SEQUENCE" ? "Segundos por imagen" : "Segundos"}
           </label>
           <input
             id="e-seconds"
@@ -219,7 +284,7 @@ export function SlideForm({
             onChange={(e) => setEffect(e.target.value as SlideEffect)}
             className={inputClass}
           >
-            {EFFECTS.map((ef) => (
+            {effects.map((ef) => (
               <option key={ef.value} value={ef.value}>
                 {ef.label}
               </option>
@@ -227,9 +292,11 @@ export function SlideForm({
           </select>
         </div>
       </div>
-      <p className="-mt-2 text-xs text-neutral-500">
-        Si hay muchos platos, se reparten en páginas y cada una dura estos segundos.
-      </p>
+      {!isGallery && (
+        <p className="-mt-2 text-xs text-neutral-500">
+          Si hay muchos platos, se reparten en páginas y cada una dura estos segundos.
+        </p>
+      )}
 
       <fieldset className="space-y-3 rounded-lg bg-neutral-50 p-4 ring-1 ring-neutral-200">
         <legend className="px-1 text-sm font-semibold">Cuándo se muestra</legend>
