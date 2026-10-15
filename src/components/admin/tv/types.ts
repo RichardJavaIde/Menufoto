@@ -7,4 +7,5 @@ export type ScreenRow = {
   active: boolean;
   slideCount: number;
   lastSeen: string | null; // ya formateado en la zona del restaurante
+  online: boolean; // se conectó en los últimos 3 minutos
 };

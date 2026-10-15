@@ -154,7 +154,60 @@ export function TvPlayer({ token, initial, etag, serverNowMs }: Props) {
       img.src = url;
     });
   }, [frames, index]);
+  // Latido: avisa al panel cada minuto que esta pantalla está encendida
+  useEffect(() => {
+    const ping = () => {
+      fetch(`/api/tv/${encodeURIComponent(token)}/ping`, {
+        method: "POST",
+        cache: "no-store",
+        keepalive: true,
+      }).catch(() => {});
+    };
+    const id = setInterval(ping, 60_000);
+    return () => clearInterval(id);
+  }, [token]);
 
+  // Evita que la pantalla se apague (en navegadores que lo permiten)
+  useEffect(() => {
+    let lock: WakeLockSentinel | null = null;
+
+    const request = async () => {
+      try {
+        if ("wakeLock" in navigator) lock = await navigator.wakeLock.request("screen");
+      } catch {
+        // Sin permiso o sin soporte: no pasa nada
+      }
+    };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") request();
+    };
+
+    request();
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      lock?.release().catch(() => {});
+    };
+  }, []);
+
+  // Cada 6 horas recarga la página completa (solo si el servidor responde)
+  useEffect(() => {
+    const id = setInterval(
+      async () => {
+        try {
+          const res = await fetch(`/api/tv/${encodeURIComponent(token)}`, {
+            cache: "no-store",
+            headers: { "If-None-Match": etagRef.current },
+          });
+          if (res.ok || res.status === 304) window.location.reload();
+        } catch {
+          // Sin conexión: se intenta de nuevo en 6 horas
+        }
+      },
+      6 * 60 * 60 * 1000
+    );
+    return () => clearInterval(id);
+  }, [token]);
   const frame = frames ? frames[index] : undefined;
 
   return (

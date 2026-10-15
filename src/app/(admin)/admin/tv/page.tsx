@@ -4,6 +4,7 @@ import { requireSection } from "@/lib/auth";
 import { siteUrl } from "@/lib/site";
 import { TvManager } from "@/components/admin/tv/tv-manager";
 
+const ONLINE_MS = 3 * 60 * 1000;
 export default async function TvPage() {
   await requireSection("tv");
 
@@ -36,6 +37,7 @@ export default async function TvPage() {
         active: s.active,
         slideCount: s._count.slides,
         lastSeen: s.lastSeenAt ? fmt.format(s.lastSeenAt) : null,
+        online: s.lastSeenAt !== null && Date.now() - s.lastSeenAt.getTime() < ONLINE_MS,
       }))}
     />
   );

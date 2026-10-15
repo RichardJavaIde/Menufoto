@@ -1,7 +1,6 @@
 //src/components/admin/tv/tv-manager.tsx
 "use client";
 
-import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Modal } from "@/components/ui/modal";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -12,6 +11,8 @@ import type { ScreenRow } from "./types";
 import Link from "next/link";
 import { Plus, Pencil, Trash2, Copy, ExternalLink, Power, PowerOff, ListOrdered } from "lucide-react";
 import { primaryButton, secondaryButton } from "@/components/ui/styles";
+import { useEffect, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 
 type ModalState =
   | { type: "create" }
@@ -25,7 +26,13 @@ const iconButton =
 export function TvManager({ screens }: { screens: ScreenRow[] }) {
   const [modal, setModal] = useState<ModalState>(null);
   const [isPending, startTransition] = useTransition();
+  const router = useRouter();
 
+  // El estado "En línea" se refresca solo cada 30 segundos
+  useEffect(() => {
+    const id = setInterval(() => router.refresh(), 30_000);
+    return () => clearInterval(id);
+  }, [router]);
   const close = () => setModal(null);
 
   async function copy(url: string) {
@@ -86,6 +93,17 @@ export function TvManager({ screens }: { screens: ScreenRow[] }) {
                     ) : (
                       <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
                         Desactivada
+                      </span>
+                    )}
+                                        {s.online ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                        En línea
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-600">
+                        <span className="h-1.5 w-1.5 rounded-full bg-neutral-400" />
+                        {s.lastSeen ? "Sin conexión" : "Nunca conectada"}
                       </span>
                     )}
                   </div>
